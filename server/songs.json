@@ -1,0 +1,17 @@
+[
+  {
+    "songName": "Song A",
+    "songArtist": "Artist A",
+    "songSrc": "/songs/music_a.mp3"
+  },
+  {
+    "songName": "Song B",
+    "songArtist": "Artist B",
+    "songSrc": "/songs/music_b.mp3"
+  },
+  {
+    "songName": "Song C",
+    "songArtist": "Test C",
+    "songSrc": "/songs/music_c.mp3"
+  }
+]

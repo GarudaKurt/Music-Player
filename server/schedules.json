@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1751432207733,
+    "scheduleName": "Noon Prayer",
+    "startDate": "2025-07-02",
+    "endDate": "2025-07-02",
+    "time": "12:58",
+    "musicSrc": "/songs/music_b.mp3",
+    "filename": "music_b.mp3"
+  },
+  {
+    "id": 1751432453259,
+    "scheduleName": "Afternoon Prayer",
+    "startDate": "2025-07-02",
+    "endDate": "2025-07-02",
+    "time": "13:02",
+    "musicSrc": "/songs/music_c.mp3",
+    "filename": "music_c.mp3"
+  }
+]
