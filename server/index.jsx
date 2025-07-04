@@ -85,15 +85,18 @@ app.post('/schedules', upload.single('musicFile'), (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const scheduleData = {
-    id: Date.now(),
-    scheduleName,
-    startDate,
-    endDate,
-    time,
-    musicSrc: `/songs/${file.filename}`,
-    filename: file.originalname,
-  };
+ const scheduleData = {
+  id: Date.now(),
+  scheduleName,
+  startDate,
+  endDate,
+  time,
+  musicSrc: `/songs/${file.filename}`,
+  songName: scheduleName,       // Or store from the selected song
+  songArtist: 'Scheduled',      // Optional
+  songAvatar: './Assets/Images/image1.jpg',
+};
+
 
   const dataFile = path.join(__dirname, 'schedules.json');
   const existing = fs.existsSync(dataFile)

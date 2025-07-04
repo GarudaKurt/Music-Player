@@ -21,9 +21,30 @@ const Playlist = () => {
 
   const avatarClass = ['objectFitCover', 'objectFitContain', 'none'];
   const currentAudio = useRef();
-  const hasPlayedToday = useRef({}); // ✅ Track played schedules
+  const hasPlayedToday = useRef({});
+  const autoplayUnlocked = useRef(false);
 
-  // ✅ Fetch playlist and autoplay the first song
+  // ✅ Unlock autoplay on first user click
+  useEffect(() => {
+    const unlockAutoplay = () => {
+      if (currentAudio.current) {
+        currentAudio.current.muted = true;
+        currentAudio.current.play().then(() => {
+          currentAudio.current.pause();
+          currentAudio.current.muted = false;
+          autoplayUnlocked.current = true;
+          console.log('✅ Autoplay unlocked');
+        }).catch(err => {
+          console.warn('Autoplay unlock failed:', err.message);
+        });
+      }
+      window.removeEventListener('click', unlockAutoplay);
+    };
+
+    window.addEventListener('click', unlockAutoplay);
+    return () => window.removeEventListener('click', unlockAutoplay);
+  }, []);
+
   useEffect(() => {
     axios.get('http://localhost:5000/songs-list')
       .then(res => {
@@ -36,10 +57,8 @@ const Playlist = () => {
           if (currentAudio.current) {
             currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
             currentAudio.current.load();
-            currentAudio.current.play().catch(err => {
-              console.warn('Autoplay blocked:', err.message);
-            });
-            setIsAudioPlaying(true);
+            // Do NOT autoplay immediately to avoid block
+            // Wait for user interaction to unlock
           }
         }
       })
@@ -54,10 +73,10 @@ const Playlist = () => {
         const schedules = schedulesRes.data;
 
         const now = new Date();
-        const today = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
+        const today = now.toISOString().split('T')[0];
         const hour = now.getHours().toString().padStart(2, '0');
         const minute = now.getMinutes().toString().padStart(2, '0');
-        const currentTime = `${hour}:${minute}`; // "HH:MM"
+        const currentTime = `${hour}:${minute}`;
 
         schedules.forEach((schedule) => {
           const isWithinDate =
@@ -67,24 +86,28 @@ const Playlist = () => {
 
           if (isWithinDate && isTimeReached && !alreadyPlayed) {
             console.log(`🎯 Playing scheduled music: ${schedule.scheduleName}`);
-
             hasPlayedToday.current[schedule.id] = true;
 
             setCurrentMusicDetails({
-              songName: schedule.scheduleName,
-              songArtist: 'Scheduled',
+              songName: schedule.songName || schedule.scheduleName,
+              songArtist: schedule.songArtist || 'Scheduled',
               songSrc: schedule.musicSrc,
-              songAvatar: './Assets/Images/image1.jpg'
+              songAvatar: schedule.songAvatar || './Assets/Images/image1.jpg'
             });
 
             const src = `http://localhost:5000${schedule.musicSrc}`;
             if (currentAudio.current) {
               currentAudio.current.src = src;
               currentAudio.current.load();
-              currentAudio.current.play().catch((err) => {
-                console.warn('Scheduled autoplay blocked:', err.message);
-              });
-              setIsAudioPlaying(true);
+
+              if (autoplayUnlocked.current) {
+                currentAudio.current.play().catch((err) => {
+                  console.warn('Scheduled autoplay blocked:', err.message);
+                });
+                setIsAudioPlaying(true);
+              } else {
+                console.warn('⚠️ Scheduled music not played. Waiting for user interaction.');
+              }
             }
           }
         });

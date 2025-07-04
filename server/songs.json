@@ -1,17 +1,17 @@
 [
   {
-    "songName": "Song A",
-    "songArtist": "Artist A",
+    "songName": "Test A",
+    "songArtist": "worship",
     "songSrc": "/songs/music_a.mp3"
   },
   {
-    "songName": "Song B",
-    "songArtist": "Artist B",
+    "songName": "Test B",
+    "songArtist": "workship",
     "songSrc": "/songs/music_b.mp3"
   },
   {
-    "songName": "Song C",
-    "songArtist": "Test C",
+    "songName": "Test C",
+    "songArtist": "worship",
     "songSrc": "/songs/music_c.mp3"
   }
 ]

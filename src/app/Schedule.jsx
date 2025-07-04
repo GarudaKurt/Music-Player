@@ -72,53 +72,63 @@ const Schedule = () => {
 
   return (
     <div className="addmusic-container">
-      <h2 className="addmusic-heading">⏰ Schedule Music</h2>
-      <form className="addmusic-form" onSubmit={handleScheduleSubmit}>
-        <label>
-          <input
-            placeholder="Schedule Name"
-            type="text"
-            value={scheduleName}
-            onChange={(e) => setScheduleName(e.target.value)}
-            className="addmusic-input"
-          />
-        </label>
+    <h2 className="addmusic-heading">⏰ Schedule Music</h2>
+    <form className="addmusic-form" onSubmit={handleScheduleSubmit}>
+          <div className="input-row">
+            <label>
+              Schedule Name:
+              <input
+                placeholder="Enter schedule name"
+                type="text"
+                value={scheduleName}
+                onChange={(e) => setScheduleName(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
 
-        <label>
-          Start Date:
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="addmusic-input"
-          />
-        </label>
+            <label>
+              Time:
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
+          </div>
 
-        <label>
-          End Date:
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="addmusic-input"
-          />
-        </label>
+          <div className="input-row">
+            <label>
+              Start Date:
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
 
-        <input
-        type="time"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        className="addmusic-input"
-        />
+            <label>
+              End Date:
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
+          </div>
 
-        <button type="button" className="addmusic-button" onClick={openModal}>
-        {musicFile ? `🎵 ${musicFile.songName} - ${musicFile.songArtist}` : "Select Music"}
-        </button>
+          <button type="button" className="addmusic-button" onClick={openModal}>
+            {musicFile ? `🎵 ${musicFile.songName} - ${musicFile.songArtist}` : "Select Music"}
+          </button>
 
-        <button type="submit" className="addmusic-button" disabled={saving}>
-          {saving ? "Saving..." : "Set Schedule"}
-        </button>
+          <button type="submit" className="addmusic-button" disabled={saving}>
+            {saving ? "Saving..." : "Set Schedule"}
+          </button>
       </form>
+
+
 
       {showModal && (
         <div className="music-modal">

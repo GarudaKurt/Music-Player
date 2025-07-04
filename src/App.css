@@ -211,6 +211,19 @@ body{
   background-color: #e6486f;
 }
 
+.input-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.input-row label {
+  flex: 1;
+  min-width: 45%;
+}
+
+
+
 /* Responsive Styles */
 @media (max-width: 600px) {
   .addmusic-container {
