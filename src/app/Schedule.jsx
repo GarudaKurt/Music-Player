@@ -85,9 +85,21 @@ const Schedule = () => {
                 className="addmusic-input"
               />
             </label>
-
+          </div>
+          
+          <div className="input-row">
+            
             <label>
-              Time:
+              Start Time:
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
+              <label>
+              End Time:
               <input
                 type="time"
                 value={time}
