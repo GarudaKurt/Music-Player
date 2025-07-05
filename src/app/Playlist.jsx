@@ -8,7 +8,7 @@ const Playlist = () => {
     songName: '',
     songArtist: '',
     songSrc: '',
-    songAvatar: './Assets/Images/image1.jpg'
+    songAvatar: './Assets/Images/image2.png'
   });
 
   const [audioProgress, setAudioProgress] = useState(0);
@@ -23,8 +23,8 @@ const Playlist = () => {
   const currentAudio = useRef();
   const hasPlayedToday = useRef({});
   const autoplayUnlocked = useRef(false);
+  const isScheduledPlaying = useRef(false); // ✅ Added flag
 
-  // ✅ Unlock autoplay on first user click
   useEffect(() => {
     const unlockAutoplay = () => {
       if (currentAudio.current) {
@@ -57,15 +57,12 @@ const Playlist = () => {
           if (currentAudio.current) {
             currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
             currentAudio.current.load();
-            // Do NOT autoplay immediately to avoid block
-            // Wait for user interaction to unlock
           }
         }
       })
       .catch(err => console.error('Failed to fetch songs:', err));
   }, []);
 
-  // ✅ Check and auto-play scheduled song
   useEffect(() => {
     const checkAndPlayScheduledSong = async () => {
       try {
@@ -88,11 +85,13 @@ const Playlist = () => {
             console.log(`🎯 Playing scheduled music: ${schedule.scheduleName}`);
             hasPlayedToday.current[schedule.id] = true;
 
+            isScheduledPlaying.current = true; // ✅ mark as scheduled
+
             setCurrentMusicDetails({
               songName: schedule.songName || schedule.scheduleName,
               songArtist: schedule.songArtist || 'Scheduled',
               songSrc: schedule.musicSrc,
-              songAvatar: schedule.songAvatar || './Assets/Images/image1.jpg'
+              songAvatar: './Assets/Images/image2.png'
             });
 
             const src = `http://localhost:5000${schedule.musicSrc}`;
@@ -142,6 +141,7 @@ const Playlist = () => {
   };
 
   const updateCurrentMusicDetails = (index) => {
+    isScheduledPlaying.current = false; // ✅ reset for manual play
     const music = musicAPI[index];
     if (!music) return;
 
@@ -158,12 +158,20 @@ const Playlist = () => {
   };
 
   const handleNextSong = () => {
+    if (isScheduledPlaying.current) {
+      console.log('⏹ Scheduled song finished. Stopping autoplay.');
+      isScheduledPlaying.current = false; // ✅ reset
+      setIsAudioPlaying(false);
+      return; // ✅ prevent autoplaying next
+    }
+
     const newIndex = (musicIndex + 1) % musicAPI.length;
     setMusicIndex(newIndex);
     updateCurrentMusicDetails(newIndex);
   };
 
   const handlePrevSong = () => {
+    isScheduledPlaying.current = false; // ✅ manual interaction
     const newIndex = (musicIndex - 1 + musicAPI.length) % musicAPI.length;
     setMusicIndex(newIndex);
     updateCurrentMusicDetails(newIndex);
@@ -213,7 +221,7 @@ const Playlist = () => {
           <p className='music-Head-Name'>{currentMusicDetails.songName}</p>
           <p className='music-Artist-Name'>{currentMusicDetails.songArtist}</p>
           <img
-            src={currentMusicDetails.songAvatar || './Assets/Images/image1.jpg'}
+            src={currentMusicDetails.songAvatar || './Assets/Images/image2.png'}
             className={avatarClass[avatarClassIndex]}
             onClick={handleAvatar}
             alt="song Avatar"
