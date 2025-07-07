@@ -13,15 +13,26 @@ body{
     box-sizing: border-box;
 }
 
-.container{
-    min-height: 100vh;
-    min-width: 100vw;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: var(--mainColor);
-    font-family: 'Poppins';   
+.container {
+  min-height: 100vh;
+  min-width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--mainColor);
+  font-family: 'Poppins';
+  background: linear-gradient(-45deg, #3e5151, #decba4, #b0c4de, #e0c3fc);
+  background-size: 400% 400%;
+  animation: gradientBG 20s ease infinite;
+  position: relative;
 }
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 
 .backgroundVideo{
     position: absolute;
