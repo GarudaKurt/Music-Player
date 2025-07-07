@@ -50,6 +50,33 @@ const Playlist = () => {
   }, []);
 
   useEffect(() => {
+    const checkScheduledTimeout = setInterval(() => {
+      const now = new Date();
+
+      if (
+        isScheduledPlaying.current &&
+        scheduledLoopEndTime.current &&
+        now >= scheduledLoopEndTime.current
+      ) {
+        console.log('🛑 15-minute scheduled duration ended, stopping playback');
+
+        if (currentAudio.current) {
+          currentAudio.current.pause();
+          currentAudio.current.currentTime = 0;
+        }
+
+        isScheduledPlaying.current = false;
+        scheduledLoopStartTime.current = null;
+        scheduledLoopEndTime.current = null;
+        setIsAudioPlaying(false);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(checkScheduledTimeout);
+  }, []);
+
+
+  useEffect(() => {
     axios.get('http://localhost:5000/songs-list')
       .then(res => {
         setMusicAPI(res.data);

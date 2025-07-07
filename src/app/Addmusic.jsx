@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import '../App.css';
 
@@ -7,12 +8,44 @@ const Addmusic = () => {
   const [songArtist, setSongArtist] = useState('');
   const [songFile, setSongFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const navigate = useNavigate();
+  const idleTimerRef = useRef(null);
+
+  // 👇 Fade message after 5 seconds
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  // 👇 Idle detection: Navigate after 30s of no interaction
+  useEffect(() => {
+    const resetTimer = () => {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        navigate('/playlist');
+      }, 30000); // 30 seconds idle
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    resetTimer(); // Start initial timer
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+      clearTimeout(idleTimerRef.current);
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!songName || !songArtist || !songFile) {
-      alert("Please fill in all fields");
+      setMessage("Please fill in all fields");
       return;
     }
 
@@ -24,18 +57,20 @@ const Addmusic = () => {
     try {
       setUploading(true);
       await axios.post("http://localhost:5000/uploads", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      alert("Music uploaded successfully!");
+      setMessage("✅ Music uploaded successfully!");
       setSongName("");
       setSongArtist("");
       setSongFile(null);
+
+      setTimeout(() => {
+        navigate('/playlist');
+      }, 10000); // 10 seconds after upload
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload music.");
+      setMessage("❌ Failed to upload music.");
     } finally {
       setUploading(false);
     }
@@ -44,6 +79,13 @@ const Addmusic = () => {
   return (
     <div className="addmusic-container">
       <h2 className="addmusic-heading">🎵 Add New Music</h2>
+      
+      {message && (
+        <div className="message-box fade-out">
+          {message}
+        </div>
+      )}
+
       <form className="addmusic-form" onSubmit={handleSubmit}>
         <input
           type="text"

@@ -1,12 +1,12 @@
 [
   {
-    "id": 1751862228706,
-    "scheduleName": "1 PM Prayer",
-    "startDate": "2025-07-07",
-    "endDate": "2025-07-07",
-    "time": "12:24",
-    "musicSrc": "/songs/music_c.mp3",
-    "songName": "1 PM Prayer",
+    "id": 1751899281139,
+    "scheduleName": "Morning Prayer",
+    "startDate": "2025-07-08",
+    "endDate": "2025-07-08",
+    "time": "07:00",
+    "musicSrc": "/songs/music_a.mp3",
+    "songName": "Morning Prayer",
     "songArtist": "Scheduled",
     "songAvatar": "./Assets/Images/image1.png"
   }

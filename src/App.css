@@ -374,6 +374,27 @@ body{
   }
 }
 
+.message-box {
+  color: #fff;
+  background-color: #333;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  opacity: 1;
+  transition: opacity 1s ease-in-out;
+}
+
+.message-box.fade-out {
+  animation: fadeMessage 5s forwards;
+}
+
+@keyframes fadeMessage {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+
 
 
 
