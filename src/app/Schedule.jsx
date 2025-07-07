@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
 import '../App.css';
 
@@ -46,7 +46,6 @@ const Schedule = () => {
     formData.append("endDate", endDate);
     formData.append("time", time);
 
-    // ✅ Fetch the song from public server and convert to Blob
     const res = await fetch(`http://localhost:5000${musicFile.songSrc}`);
     const blob = await res.blob();
     const file = new File([blob], musicFile.songSrc.split("/").pop(), { type: "audio/mp3" });
@@ -78,37 +77,25 @@ const Schedule = () => {
             <label>
               Schedule Name:
               <input
-                placeholder="Enter schedule name"
+                placeholder="Enter name"
                 type="text"
                 value={scheduleName}
                 onChange={(e) => setScheduleName(e.target.value)}
                 className="addmusic-input"
               />
             </label>
+
+            <label>
+              Setup Time:
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="addmusic-input"
+              />
+            </label>
           </div>
           
-          <div className="input-row">
-            
-            <label>
-              Start Time:
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="addmusic-input"
-              />
-            </label>
-              <label>
-              End Time:
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="addmusic-input"
-              />
-            </label>
-          </div>
-
           <div className="input-row">
             <label>
               Start Date:

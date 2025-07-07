@@ -12,15 +12,13 @@ app.use(express.json());
 
 const uploadPath = path.join(__dirname, 'list-of-songs');
 
-// ✅ Ensure directory exists
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
 
-// ✅ Serve uploaded files
 app.use('/songs', express.static(uploadPath));
 
-// ✅ Multer storage config
+//  Multer storage config
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadPath);
@@ -36,7 +34,7 @@ const upload = multer({ storage });
 app.get('/songs-list', (req, res) => {
   const dataFile = path.join(__dirname, 'songs.json');
   if (!fs.existsSync(dataFile)) {
-    return res.json([]); // return empty array if file doesn't exist
+    return res.json([]); 
   }
 
   const songList = JSON.parse(fs.readFileSync(dataFile));
@@ -62,7 +60,7 @@ app.post('/uploads', upload.single('songFile'), (req, res) => {
   existing.push(songData);
   fs.writeFileSync(dataFile, JSON.stringify(existing, null, 2));
 
-  console.log(`✅ Uploaded: ${file.originalname}`);
+  console.log(`Uploaded: ${file.originalname}`);
   return res.status(200).json({ message: 'Uploaded successfully', song: songData });
 });
 
@@ -92,9 +90,9 @@ app.post('/schedules', upload.single('musicFile'), (req, res) => {
   endDate,
   time,
   musicSrc: `/songs/${file.filename}`,
-  songName: scheduleName,       // Or store from the selected song
-  songArtist: 'Scheduled',      // Optional
-  songAvatar: './Assets/Images/image1.jpg',
+  songName: scheduleName, 
+  songArtist: 'Scheduled',
+  songAvatar: './Assets/Images/image1.png',
 };
 
 
@@ -106,7 +104,7 @@ app.post('/schedules', upload.single('musicFile'), (req, res) => {
   existing.push(scheduleData);
   fs.writeFileSync(dataFile, JSON.stringify(existing, null, 2));
 
-  console.log(`✅ Scheduled: ${scheduleName} from ${startDate} to ${endDate} at ${time}`);
+  console.log(`Scheduled: ${scheduleName} from ${startDate} to ${endDate} at ${time}`);
   return res.status(200).json({ message: 'Schedule saved', schedule: scheduleData });
 });
 
