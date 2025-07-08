@@ -7,7 +7,8 @@ const Schedule = () => {
   const [scheduleName, setScheduleName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [time, setTime] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [musicFile, setMusicFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -68,54 +69,66 @@ const Schedule = () => {
   }, [navigate]);
 
   // ✅ Handle submit
-  const handleScheduleSubmit = async (e) => {
-    e.preventDefault();
+const handleScheduleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!scheduleName || !startDate || !endDate || !time || !musicFile) {
-      setMessage("⚠️ Please fill in all fields");
-      return;
-    }
+  if (!scheduleName || !startDate || !endDate || !musicFile || !startTime || !endTime) {
+    setMessage("⚠️ Please fill in all fields");
+    return;
+  }
 
-    try {
-      setSaving(true);
+  const formData = new FormData(); // ✅ Moved outside try block so it's defined
 
-      const formData = new FormData();
-      formData.append("scheduleName", scheduleName);
-      formData.append("startDate", startDate);
-      formData.append("endDate", endDate);
-      formData.append("time", time);
+  try {
+    setSaving(true);
 
-      const res = await fetch(`http://localhost:5000${musicFile.songSrc}`);
-      const blob = await res.blob();
-      const file = new File([blob], musicFile.songSrc.split("/").pop(), {
-        type: "audio/mp3",
-      });
+    formData.append("scheduleName", scheduleName);
+    formData.append("startDate", startDate);
+    formData.append("endDate", endDate);
+    formData.append("startTime", startTime);
+    formData.append("endTime", endTime);
 
-      formData.append("musicFile", file);
+    const res = await fetch(`http://localhost:5000${musicFile.songSrc}`);
+    const blob = await res.blob();
+    const file = new File([blob], musicFile.songSrc.split("/").pop(), {
+      type: "audio/mp3",
+    });
 
-      await axios.post("http://localhost:5000/schedules", formData);
+    formData.append("musicFile", file);
 
+    const response = await axios.post("http://localhost:5000/schedules", formData);
+
+    console.log("✅ Server response:", response);
+
+    if (response.status >= 200 && response.status < 300) {
       setMessage("✅ Schedule saved successfully!");
-
-      // Clear form
-      setScheduleName('');
-      setStartDate('');
-      setEndDate('');
-      setTime('');
-      setMusicFile(null);
-
-      // Redirect after 10 seconds
-      setTimeout(() => {
-        navigate('/playlist');
-      }, 10000);
-
-    } catch (error) {
-      console.error("Save error:", error);
-      setMessage("❌ Failed to save schedule.");
-    } finally {
-      setSaving(false);
+    } else {
+      setMessage("⚠️ Schedule saved but server returned unexpected status.");
     }
-  };
+
+    // Clear form
+    setScheduleName('');
+    setStartDate('');
+    setEndDate('');
+    setStartTime('');
+    setEndTime('');
+    setMusicFile(null);
+
+    // Redirect after 10 seconds
+    setTimeout(() => {
+      navigate('/playlist');
+    }, 10000);
+
+  } catch (error) {
+    console.error("❌ Save error:", error);
+    if (error.response) {
+      console.error("❗ Server responded with error:", error.response.data);
+    }
+    setMessage("❌ Failed to save schedule.");
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="addmusic-container">
@@ -135,13 +148,25 @@ const Schedule = () => {
               className="addmusic-input"
             />
           </label>
+        </div>
 
+        <div className="input-row">
           <label>
-            Setup Time:
+            Start Time:
             <input
               type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="addmusic-input"
+            />
+          </label>
+
+          <label>
+            End Time:
+            <input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
               className="addmusic-input"
             />
           </label>

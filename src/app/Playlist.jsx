@@ -18,6 +18,7 @@ const Playlist = () => {
   const [musicCurrentTime, setMusicCurrentTime] = useState('00 : 00');
   const [videoIndex, setVideoIndex] = useState(0);
   const [avatarClassIndex, setAvatarClassIndex] = useState(0);
+  const [hasEnded, setHasEnded] = useState(false)
 
   const avatarClass = ['objectFitCover', 'objectFitContain', 'none'];
   const currentAudio = useRef();
@@ -48,17 +49,33 @@ const Playlist = () => {
     window.addEventListener('click', unlockAutoplay);
     return () => window.removeEventListener('click', unlockAutoplay);
   }, []);
+ useEffect(() => {
+    axios.get('http://localhost:5000/songs-list')
+      .then(res => {
+        setMusicAPI(res.data);
+        if (res.data.length > 0) {
+          const firstSong = res.data[0];
+          setCurrentMusicDetails(firstSong);
+          if (currentAudio.current) {
+            currentAudio.current.oncanplay = null;
+            currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
+            currentAudio.current.load();
+          }
+        }
+      })
+      .catch(err => console.error('Failed to fetch songs:', err));
+  }, []);
 
   useEffect(() => {
     const checkScheduledTimeout = setInterval(() => {
       const now = new Date();
-
       if (
         isScheduledPlaying.current &&
         scheduledLoopEndTime.current &&
         now >= scheduledLoopEndTime.current
       ) {
         console.log('🛑 15-minute scheduled duration ended, stopping playback');
+        setHasEnded(true);
 
         if (currentAudio.current) {
           currentAudio.current.pause();
@@ -70,29 +87,10 @@ const Playlist = () => {
         scheduledLoopEndTime.current = null;
         setIsAudioPlaying(false);
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
     return () => clearInterval(checkScheduledTimeout);
   }, []);
-
-
-  useEffect(() => {
-    axios.get('http://localhost:5000/songs-list')
-      .then(res => {
-        setMusicAPI(res.data);
-        if (res.data.length > 0) {
-          const firstSong = res.data[0];
-          setCurrentMusicDetails(firstSong);
-          if (currentAudio.current) {
-            currentAudio.current.oncanplay = null; // 🚫 Clear any existing autoplay logic
-            currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
-            currentAudio.current.load(); // ✅ Prepares it but does NOT autoplay
-          }
-        }
-      })
-      .catch(err => console.error('Failed to fetch songs:', err));
-  }, []);
-
 
   useEffect(() => {
     const checkAndPlayScheduledSong = async () => {
@@ -102,76 +100,71 @@ const Playlist = () => {
 
         const now = new Date();
         const today = now.toISOString().split('T')[0];
-        const hour = now.getHours().toString().padStart(2, '0');
-        const minute = now.getMinutes().toString().padStart(2, '0');
-        const currentTime = `${hour}:${minute}`;
+        const currentTimeString = now.toTimeString().slice(0, 5);
 
         schedules.forEach((schedule) => {
           const isWithinDate = schedule.startDate <= today && schedule.endDate >= today;
-          const isTimeReached = currentTime >= schedule.time;
           const alreadyPlayed = hasPlayedToday.current[schedule.id];
 
-          if (isWithinDate && isTimeReached && !alreadyPlayed) {
+          const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
+          const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
+
+          const startTime = new Date(now);
+          startTime.setHours(startHour, startMinute, 0, 0);
+
+          const endTime = new Date(now);
+          endTime.setHours(endHour, endMinute, 0, 0);
+
+          const isWithinTimeRange = now >= startTime && now <= endTime;
+
+          if (isWithinDate && isWithinTimeRange && !alreadyPlayed) {
+            if (hasEnded) {
+              console.log('🔄 Resetting hasEnded because a new valid schedule started');
+              setHasEnded(false);
+            }
+
             console.log(`🎯 Playing scheduled music: ${schedule.scheduleName}`);
             hasPlayedToday.current[schedule.id] = true;
             isScheduledPlaying.current = true;
+            scheduledLoopStartTime.current = startTime;
+            scheduledLoopEndTime.current = endTime;
 
             const src = new URL(schedule.musicSrc, 'http://localhost:5000').toString();
-            console.log('🎵 Audio source set to:', src);
 
             setCurrentMusicDetails({
               songName: schedule.songName || schedule.scheduleName,
               songArtist: schedule.songArtist || 'Scheduled',
               songSrc: schedule.musicSrc,
-              songAvatar: './Assets/Images/image2.png'
+              songAvatar: './Assets/Images/image2.png',
             });
 
             if (currentAudio.current) {
               const audioEl = currentAudio.current;
-              console.log('🔍 currentAudio readyState:', audioEl.readyState);
 
-              // Ensure event is bound before load
-              audioEl.oncanplay = () => {
-                console.log('🎧 oncanplay triggered');
-                const tryPlay = () => {
+              const tryPlay = () => {
+                audioEl.play().then(() => {
+                  console.log('✅ Scheduled audio playing');
+                  setIsAudioPlaying(true);
+                }).catch((err) => {
+                  console.warn('❌ Autoplay blocked:', err.message);
+                  audioEl.muted = true;
                   audioEl.play().then(() => {
-                    console.log('✅ Scheduled audio playing');
+                    console.log('🔈 Muted autoplay fallback success');
                     setIsAudioPlaying(true);
-                    scheduledLoopStartTime.current = new Date();
-                    scheduledLoopEndTime.current = new Date(
-                      scheduledLoopStartTime.current.getTime() + 15 * 60000
-                    );
-                  }).catch((err) => {
-                    console.warn('❌ Autoplay blocked:', err.message);
-
-                    // 🔇 Fallback: muted autoplay
-                    audioEl.muted = true;
-                    audioEl.play().then(() => {
-                      console.log('🔇 Muted autoplay fallback success');
-                      setIsAudioPlaying(true);
-                      scheduledLoopStartTime.current = new Date();
-                      scheduledLoopEndTime.current = new Date(
-                        scheduledLoopStartTime.current.getTime() + 15 * 60000
-                      );
-                    }).catch((e) => {
-                      console.error('🚫 Even muted autoplay failed:', e.message);
-                    });
+                  }).catch((e) => {
+                    console.error('🚫 Even muted autoplay failed:', e.message);
                   });
-                };
-
-                // Fallback timeout in case browser skips oncanplay
-                setTimeout(() => {
-                  if (audioEl.paused) tryPlay();
-                }, 500);
-
-                tryPlay();
+                });
               };
 
+              audioEl.oncanplay = tryPlay;
+
+              setTimeout(() => {
+                if (audioEl.paused) tryPlay();
+              }, 1000);
+
               audioEl.src = src;
-              audioEl.load(); // Triggers oncanplay
-              console.log('📦 Audio load triggered');
-            } else {
-              console.warn('⚠️ currentAudio ref is null');
+              audioEl.load();
             }
           }
         });
@@ -183,7 +176,34 @@ const Playlist = () => {
     checkAndPlayScheduledSong();
     const interval = setInterval(checkAndPlayScheduledSong, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [hasEnded]);
+
+
+// ✅ Update this useEffect to stop playback using endTime from the schedule
+useEffect(() => {
+  const checkScheduledTimeout = setInterval(() => {
+    const now = new Date();
+    if (
+      isScheduledPlaying.current &&
+      scheduledLoopEndTime.current &&
+      now >= scheduledLoopEndTime.current
+    ) {
+      console.log('\u{1F6D1} Schedule end reached, stopping audio');
+
+      if (currentAudio.current) {
+        currentAudio.current.pause();
+        currentAudio.current.currentTime = 0;
+      }
+
+      isScheduledPlaying.current = false;
+      setIsAudioPlaying(false);
+    }
+  }, 5000);
+
+  return () => clearInterval(checkScheduledTimeout);
+}, []);
+
+
 
   const handleMusicProgressBar = (e) => {
     setAudioProgress(e.target.value);
@@ -222,29 +242,38 @@ const Playlist = () => {
   };
 
   const handleNextSong = () => {
-    if (isScheduledPlaying.current) {
-      const now = new Date();
-      if (scheduledLoopEndTime.current && now < scheduledLoopEndTime.current) {
-        console.log('🔁 Replaying scheduled song');
-        currentAudio.current.currentTime = 0;
-        currentAudio.current.play().catch(err => {
-          console.warn('Loop playback error:', err.message);
-        });
-        return;
-      } else {
-        console.log('⏹ Scheduled loop complete');
-        isScheduledPlaying.current = false;
-        scheduledLoopStartTime.current = null;
-        scheduledLoopEndTime.current = null;
-        setIsAudioPlaying(false);
-        return;
-      }
-    }
+  const now = new Date();
 
-    const newIndex = (musicIndex + 1) % musicAPI.length;
-    setMusicIndex(newIndex);
-    updateCurrentMusicDetails(newIndex);
-  };
+  // ⛔ Prevent replay if scheduled playback has ended
+  if (hasEnded) {
+    console.log('⏹ Music has ended due to schedule timeout. Ignoring replay.');
+    return;
+  }
+
+  if (
+    isScheduledPlaying.current &&
+    scheduledLoopEndTime.current &&
+    now >= scheduledLoopEndTime.current
+  ) {
+    console.log('⏹ Scheduled end reached. Ignoring onEnded.');
+    return;
+  }
+
+  // 🔁 Replay scheduled song
+  if (isScheduledPlaying.current) {
+    console.log('🔁 Replaying scheduled song');
+    currentAudio.current.currentTime = 0;
+    currentAudio.current.play().catch(err => {
+      console.warn('Loop playback error:', err.message);
+    });
+    return;
+  }
+
+  // 🔄 Proceed to next song in the playlist
+  const newIndex = (musicIndex + 1) % musicAPI.length;
+  setMusicIndex(newIndex);
+  updateCurrentMusicDetails(newIndex);
+};
 
   const handlePrevSong = () => {
     isScheduledPlaying.current = false;
