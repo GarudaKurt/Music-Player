@@ -1,3 +1,5 @@
+// ✅ Updated Schedule.jsx to support multiple music selection via checkboxes
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -9,18 +11,16 @@ const Schedule = () => {
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [musicFile, setMusicFile] = useState(null);
+  const [selectedSongs, setSelectedSongs] = useState([]); // multiple selection
   const [saving, setSaving] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [availableMusics, setAvailableMusics] = useState([]);
 
   const [message, setMessage] = useState("");
-
   const navigate = useNavigate();
   const idleTimerRef = useRef(null);
 
-  // ✅ Fetch music list
   const fetchAvailableMusics = async () => {
     try {
       const res = await axios.get("http://localhost:5000/songs-list");
@@ -31,17 +31,20 @@ const Schedule = () => {
     }
   };
 
+  const toggleSongSelection = (song) => {
+    const exists = selectedSongs.find((s) => s.songSrc === song.songSrc);
+    if (exists) {
+      setSelectedSongs(selectedSongs.filter((s) => s.songSrc !== song.songSrc));
+    } else {
+      setSelectedSongs([...selectedSongs, song]);
+    }
+  };
+
   const openModal = () => {
     fetchAvailableMusics();
     setShowModal(true);
   };
 
-  const selectMusic = (song) => {
-    setMusicFile(song);
-    setShowModal(false);
-  };
-
-  // ✅ Auto-fade messages
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(""), 5000);
@@ -49,13 +52,10 @@ const Schedule = () => {
     }
   }, [message]);
 
-  // ✅ Auto redirect on inactivity
   useEffect(() => {
     const resetTimer = () => {
       clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = setTimeout(() => {
-        navigate("/playlist");
-      }, 30000); // 30s
+      idleTimerRef.current = setTimeout(() => navigate("/playlist"), 30000);
     };
 
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
@@ -68,67 +68,51 @@ const Schedule = () => {
     };
   }, [navigate]);
 
-  // ✅ Handle submit
-const handleScheduleSubmit = async (e) => {
-  e.preventDefault();
+  const handleScheduleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!scheduleName || !startDate || !endDate || !musicFile || !startTime || !endTime) {
-    setMessage("⚠️ Please fill in all fields");
-    return;
-  }
-
-  const formData = new FormData(); // ✅ Moved outside try block so it's defined
-
-  try {
-    setSaving(true);
-
-    formData.append("scheduleName", scheduleName);
-    formData.append("startDate", startDate);
-    formData.append("endDate", endDate);
-    formData.append("startTime", startTime);
-    formData.append("endTime", endTime);
-
-    const res = await fetch(`http://localhost:5000${musicFile.songSrc}`);
-    const blob = await res.blob();
-    const file = new File([blob], musicFile.songSrc.split("/").pop(), {
-      type: "audio/mp3",
-    });
-
-    formData.append("musicFile", file);
-
-    const response = await axios.post("http://localhost:5000/schedules", formData);
-
-    console.log("✅ Server response:", response);
-
-    if (response.status >= 200 && response.status < 300) {
-      setMessage("✅ Schedule saved successfully!");
-    } else {
-      setMessage("⚠️ Schedule saved but server returned unexpected status.");
+    if (!scheduleName || !startDate || !endDate || !startTime || !endTime || selectedSongs.length === 0) {
+      setMessage("\u26A0\uFE0F Please fill in all fields and select at least one music");
+      return;
     }
 
-    // Clear form
-    setScheduleName('');
-    setStartDate('');
-    setEndDate('');
-    setStartTime('');
-    setEndTime('');
-    setMusicFile(null);
+ try {
+  setSaving(true);
 
-    // Redirect after 10 seconds
-    setTimeout(() => {
-      navigate('/playlist');
-    }, 10000);
+  const schedulePayload = {
+    scheduleName,
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    songs: selectedSongs
+  };
 
-  } catch (error) {
-    console.error("❌ Save error:", error);
-    if (error.response) {
-      console.error("❗ Server responded with error:", error.response.data);
+  await axios.post("http://localhost:5000/schedules", schedulePayload, {
+    headers: {
+      'Content-Type': 'application/json'
     }
-    setMessage("❌ Failed to save schedule.");
-  } finally {
-    setSaving(false);
-  }
-};
+  });
+
+  setMessage("✅ Schedule saved successfully!");
+  setScheduleName('');
+  setStartDate('');
+  setEndDate('');
+  setStartTime('');
+  setEndTime('');
+  setSelectedSongs([]);
+
+  setTimeout(() => {
+    navigate('/playlist');
+  }, 5000);
+} catch (error) {
+  console.error("❌ Save error:", error);
+  setMessage("❌ Failed to save schedule.");
+} finally {
+  setSaving(false);
+}
+
+  };
 
   return (
     <div className="addmusic-container">
@@ -140,62 +124,22 @@ const handleScheduleSubmit = async (e) => {
         <div className="input-row">
           <label>
             Schedule Name:
-            <input
-              placeholder="Enter name"
-              type="text"
-              value={scheduleName}
-              onChange={(e) => setScheduleName(e.target.value)}
-              className="addmusic-input"
-            />
+            <input type="text" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} className="addmusic-input" />
           </label>
         </div>
 
         <div className="input-row">
-          <label>
-            Start Time:
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="addmusic-input"
-            />
-          </label>
-
-          <label>
-            End Time:
-            <input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="addmusic-input"
-            />
-          </label>
+          <label>Start Time:<input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="addmusic-input" /></label>
+          <label>End Time:<input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="addmusic-input" /></label>
         </div>
 
         <div className="input-row">
-          <label>
-            Start Date:
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="addmusic-input"
-            />
-          </label>
-
-          <label>
-            End Date:
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="addmusic-input"
-            />
-          </label>
+          <label>Start Date:<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="addmusic-input" /></label>
+          <label>End Date:<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="addmusic-input" /></label>
         </div>
 
         <button type="button" className="addmusic-button" onClick={openModal}>
-          {musicFile ? `🎵 ${musicFile.songName} - ${musicFile.songArtist}` : "Select Music"}
+          {selectedSongs.length > 0 ? `🎵 ${selectedSongs.length} song(s) selected` : "Select Music"}
         </button>
 
         <button type="submit" className="addmusic-button" disabled={saving}>
@@ -206,20 +150,23 @@ const handleScheduleSubmit = async (e) => {
       {showModal && (
         <div className="music-modal">
           <div className="music-modal-content">
-            <h3>Select a Music File</h3>
+            <h3>Select Music Files</h3>
             <ul className="music-list">
               {availableMusics.map((song, index) => (
-                <li
-                  key={index}
-                  onClick={() => selectMusic(song)}
-                  className="music-item"
-                >
-                  🎵 {song.songName} — <em>{song.songArtist}</em>
+                <li key={index} className="music-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedSongs.some((s) => s.songSrc === song.songSrc)}
+                      onChange={() => toggleSongSelection(song)}
+                    />
+                    🎵 {song.songName} — <em>{song.songArtist}</em>
+                  </label>
                 </li>
               ))}
             </ul>
             <button onClick={() => setShowModal(false)} className="addmusic-button">
-              Close
+              Done
             </button>
           </div>
         </div>

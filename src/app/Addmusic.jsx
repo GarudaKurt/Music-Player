@@ -13,7 +13,6 @@ const Addmusic = () => {
   const navigate = useNavigate();
   const idleTimerRef = useRef(null);
 
-  // 👇 Fade message after 5 seconds
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(""), 5000);
@@ -21,7 +20,6 @@ const Addmusic = () => {
     }
   }, [message]);
 
-  // 👇 Idle detection: Navigate after 30s of no interaction
   useEffect(() => {
     const resetTimer = () => {
       clearTimeout(idleTimerRef.current);
@@ -33,8 +31,7 @@ const Addmusic = () => {
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
     events.forEach(event => window.addEventListener(event, resetTimer));
 
-    resetTimer(); // Start initial timer
-
+    resetTimer();
     return () => {
       events.forEach(event => window.removeEventListener(event, resetTimer));
       clearTimeout(idleTimerRef.current);
@@ -67,10 +64,10 @@ const Addmusic = () => {
 
       setTimeout(() => {
         navigate('/playlist');
-      }, 10000); // 10 seconds after upload
+      }, 10000);
     } catch (error) {
       console.error("Upload error:", error);
-      setMessage("❌ Failed to upload music.");
+      setMessage("Failed to upload music.");
     } finally {
       setUploading(false);
     }

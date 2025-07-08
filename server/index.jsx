@@ -12,7 +12,6 @@ app.use(express.json());
 
 const uploadPath = path.join(__dirname, 'list-of-songs');
 
-// Create folder if it doesn't exist
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
@@ -64,22 +63,20 @@ app.post('/uploads', upload.single('songFile'), (req, res) => {
 });
 
 // Upload schedule
-app.post('/schedules', upload.single('musicFile'), (req, res) => {
+app.post('/schedules', (req, res) => {
   try {
-    const { scheduleName, startDate, endDate, startTime, endTime } = req.body;
-    const file = req.file;
+    const {
+      scheduleName,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      songs
+    } = req.body;
 
-    if (!scheduleName || !startDate || !endDate || !startTime || !endTime || !file) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!scheduleName || !startDate || !endDate || !startTime || !endTime || !Array.isArray(songs) || songs.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields or empty song list' });
     }
-
-    console.log("Incoming schedule form data:");
-    console.log("scheduleName:", scheduleName);
-    console.log("startDate:", startDate);
-    console.log("endDate:", endDate);
-    console.log("startTime:", startTime);
-    console.log("endTime:", endTime);
-    console.log("file:", file);
 
     const scheduleData = {
       id: Date.now(),
@@ -88,10 +85,12 @@ app.post('/schedules', upload.single('musicFile'), (req, res) => {
       endDate,
       startTime,
       endTime,
-      musicSrc: `/songs/${file.filename}`,
-      songName: scheduleName,
-      songArtist: 'Scheduled',
-      songAvatar: './Assets/Images/image1.png',
+      playlist: songs.map(song => ({
+        songName: song.songName,
+        songArtist: song.songArtist,
+        songSrc: song.songSrc,
+        songAvatar: song.songAvatar || './Assets/Images/image2.png'
+      }))
     };
 
     const dataFile = path.join(__dirname, 'schedules.json');
@@ -102,14 +101,15 @@ app.post('/schedules', upload.single('musicFile'), (req, res) => {
     existing.push(scheduleData);
     fs.writeFileSync(dataFile, JSON.stringify(existing, null, 2));
 
-    console.log(`✅ Scheduled: ${scheduleName} from ${startDate} to ${endDate} at ${startTime}–${endTime}`);
-    res.status(201).json({ message: 'Schedule saved', schedule: scheduleData });
+    console.log(`Scheduled playlist: ${scheduleName} with ${songs.length} songs`);
+    res.status(201).json({ message: 'Schedule saved with multiple songs', schedule: scheduleData });
 
   } catch (err) {
-    console.error("❌ Internal server error in /schedules:", err);
+    console.error("Internal server error in /schedules:", err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 
 // Get schedules
 app.get('/schedules', (req, res) => {
