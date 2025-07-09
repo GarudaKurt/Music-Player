@@ -20,6 +20,9 @@ const Playlist = () => {
   const [videoIndex, setVideoIndex] = useState(0);
   const [avatarClassIndex, setAvatarClassIndex] = useState(0);
   const [hasEnded, setHasEnded] = useState(false);
+  const [isOverrideMode, setIsOverrideMode] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pausedScheduledDetails, setPausedScheduledDetails] = useState(null);
 
   const avatarClass = ['objectFitCover', 'objectFitContain', 'none'];
   const currentAudio = useRef();
@@ -51,22 +54,24 @@ const Playlist = () => {
     return () => window.removeEventListener('click', unlockAutoplay);
   }, []);
 
-  useEffect(() => {
-    axios.get('http://localhost:5000/songs-list')
-      .then(res => {
-        setMusicAPI(res.data);
-        if (res.data.length > 0) {
-          const firstSong = res.data[0];
-          setCurrentMusicDetails(firstSong);
-          if (currentAudio.current) {
-            currentAudio.current.oncanplay = null;
-            currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
-            currentAudio.current.load();
-          }
+useEffect(() => {
+  axios.get('http://localhost:5000/songs-list')
+    .then(res => {
+      setMusicAPI(res.data);
+      if (res.data.length > 0) {
+        const firstSong = res.data[0];
+        setCurrentMusicDetails(firstSong);
+        if (currentAudio.current) {
+          currentAudio.current.oncanplay = null;
+          currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
+          currentAudio.current.load(); // ✅ load only, no autoplay
         }
-      })
-      .catch(err => console.error('Failed to fetch songs:', err));
-  }, []);
+        setIsAudioPlaying(false);
+      }
+    })
+    .catch(err => console.error('Failed to fetch songs:', err));
+}, []);
+
 
   useEffect(() => {
     const checkScheduledTimeout = setInterval(() => {
@@ -90,13 +95,13 @@ const Playlist = () => {
     return () => clearInterval(checkScheduledTimeout);
   }, []);
 
-  const playScheduledSong = (song) => {
+  const playScheduledSong = (song, scheduleName = '') => {
     const audioEl = currentAudio.current;
     if (!audioEl || !song) return;
 
     setCurrentMusicDetails({
       songName: song.songName,
-      songArtist: song.songArtist,
+      songArtist: song.songArtist || scheduleName,
       songSrc: song.songSrc,
       songAvatar: song.songAvatar || './Assets/Images/image2.png'
     });
@@ -112,10 +117,10 @@ const Playlist = () => {
         console.warn('Autoplay error:', err.message);
         audioEl.muted = true;
         audioEl.play().then(() => {
-          console.log(' Muted autoplay fallback success');
+          console.log('Muted autoplay fallback success');
           setIsAudioPlaying(true);
         }).catch((e) => {
-          console.error(' Even muted autoplay failed:', e.message);
+          console.error('Even muted autoplay failed:', e.message);
         });
       });
     };
@@ -128,6 +133,7 @@ const Playlist = () => {
 
   useEffect(() => {
     const checkAndPlayScheduledSong = async () => {
+      if (isOverrideMode) return; // don't override if manual override is playing
       try {
         const schedulesRes = await axios.get('http://localhost:5000/schedules');
         const schedules = schedulesRes.data;
@@ -138,6 +144,7 @@ const Playlist = () => {
         schedules.forEach((schedule) => {
           const isWithinDate = schedule.startDate <= today && schedule.endDate >= today;
           const alreadyPlayed = hasPlayedToday.current[schedule.id];
+          
 
           const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
           const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
@@ -160,7 +167,7 @@ const Playlist = () => {
               console.log(`Playing scheduled playlist: ${schedule.scheduleName}`);
               setScheduledPlaylist(schedule.playlist);
               setScheduledSongIndex(0);
-              playScheduledSong(schedule.playlist[0]);
+              playScheduledSong(schedule.playlist[0], schedule.scheduleName);
               isScheduledPlaying.current = true;
               hasPlayedToday.current[schedule.id] = true;
               scheduledLoopStartTime.current = startTime;
@@ -176,45 +183,85 @@ const Playlist = () => {
     checkAndPlayScheduledSong();
     const interval = setInterval(checkAndPlayScheduledSong, 30000);
     return () => clearInterval(interval);
-  }, [hasEnded]);
+  }, [hasEnded, isOverrideMode]);
 
-  const handleNextSong = () => {
-    const now = new Date();
-    if (hasEndedRef.current || (isScheduledPlaying.current && scheduledLoopEndTime.current && now >= scheduledLoopEndTime.current)) {
-      return;
+  const handleOverrideClick = () => {
+    if (isOverrideMode) {
+      if (pausedScheduledDetails) {
+        setCurrentMusicDetails(pausedScheduledDetails);
+        currentAudio.current.src = `http://localhost:5000${pausedScheduledDetails.songSrc}`;
+        currentAudio.current.load();
+        currentAudio.current.play();
+        setIsAudioPlaying(true);
+      }
+      setIsOverrideMode(false);
+      setPausedScheduledDetails(null);
+    } else {
+      if (isScheduledPlaying.current) {
+        currentAudio.current.pause();
+        setPausedScheduledDetails(currentMusicDetails);
+      }
+      setIsModalOpen(true);
     }
-    if (isScheduledPlaying.current && scheduledPlaylist.length > 0) {
-      const nextIndex = (scheduledSongIndex + 1) % scheduledPlaylist.length;
-      setScheduledSongIndex(nextIndex);
-      playScheduledSong(scheduledPlaylist[nextIndex]);
-      return;
-    }
-    const newIndex = (musicIndex + 1) % musicAPI.length;
-    setMusicIndex(newIndex);
-    updateCurrentMusicDetails(newIndex);
   };
 
-  const handlePrevSong = () => {
-    isScheduledPlaying.current = false;
-    const newIndex = (musicIndex - 1 + musicAPI.length) % musicAPI.length;
-    setMusicIndex(newIndex);
-    updateCurrentMusicDetails(newIndex);
-  };
-
-  const updateCurrentMusicDetails = (index) => {
-    isScheduledPlaying.current = false;
-    const music = musicAPI[index];
-    if (!music) return;
-    setCurrentMusicDetails(music);
-    if (currentAudio.current) {
-      currentAudio.current.src = `http://localhost:5000${music.songSrc}`;
-      currentAudio.current.load();
-      currentAudio.current.play().catch(err => {
-        console.warn('Play error:', err.message);
-      });
-    }
+  const handleSelectOverrideSong = (song) => {
+    setCurrentMusicDetails(song);
+    currentAudio.current.src = `http://localhost:5000${song.songSrc}`;
+    currentAudio.current.load();
+    currentAudio.current.play();
     setIsAudioPlaying(true);
+    setIsOverrideMode(true);
+    setIsModalOpen(false);
   };
+
+const handleNextSong = () => {
+  const now = new Date();
+  if (hasEndedRef.current || (isScheduledPlaying.current && scheduledLoopEndTime.current && now >= scheduledLoopEndTime.current)) {
+    return;
+  }
+
+  if (isScheduledPlaying.current && scheduledPlaylist.length > 0) {
+    const nextIndex = (scheduledSongIndex + 1) % scheduledPlaylist.length;
+    setScheduledSongIndex(nextIndex);
+    playScheduledSong(scheduledPlaylist[nextIndex]);
+    return;
+  }
+
+  const newIndex = (musicIndex + 1) % musicAPI.length;
+  setMusicIndex(newIndex);
+  updateCurrentMusicDetails(newIndex, true); // ✅ autoplay on navigation
+};
+
+
+const handlePrevSong = () => {
+  isScheduledPlaying.current = false;
+  const newIndex = (musicIndex - 1 + musicAPI.length) % musicAPI.length;
+  setMusicIndex(newIndex);
+  updateCurrentMusicDetails(newIndex, true); // ✅ autoplay on navigation
+};
+
+
+ const updateCurrentMusicDetails = (index, playNow = true) => {
+  isScheduledPlaying.current = false;
+  const music = musicAPI[index];
+  if (!music) return;
+
+  setCurrentMusicDetails(music);
+
+  if (currentAudio.current) {
+    currentAudio.current.src = `http://localhost:5000${music.songSrc}`;
+    currentAudio.current.load();
+    if (playNow) {
+      currentAudio.current.play()
+        .then(() => setIsAudioPlaying(true))
+        .catch(err => console.warn('Play error:', err.message));
+    }
+  }
+
+  if (!playNow) setIsAudioPlaying(false);
+};
+
 
   const handleMusicProgressBar = (e) => {
     setAudioProgress(e.target.value);
@@ -248,18 +295,7 @@ const Playlist = () => {
     setAudioProgress(isNaN(progress) ? 0 : progress);
   };
 
-  const vidArray = [
-    './Assets/Videos/video1.mp4',
-    './Assets/Videos/video2.mp4',
-    './Assets/Videos/video3.mp4',
-    './Assets/Videos/video4.mp4',
-    './Assets/Videos/video5.mp4',
-    './Assets/Videos/video6.mp4'
-  ];
 
-  const handleChangeBackground = () => {
-    setVideoIndex((prev) => (prev + 1) % vidArray.length);
-  };
 
   return (
     <>
@@ -269,7 +305,6 @@ const Playlist = () => {
           onEnded={handleNextSong}
           onTimeUpdate={handleAudioUpdate}
         />
-        <video src={vidArray[videoIndex]} loop muted autoPlay className='backgroundVideo'></video>
         <div className="blackScreen"></div>
         <div className="music-Container">
           <p className='musicPlayer'>Music Player</p>
@@ -297,7 +332,26 @@ const Playlist = () => {
             <i className={`fa-solid ${isAudioPlaying ? 'fa-pause-circle' : 'fa-circle-play'} playBtn`} onClick={handleAudioPlay}></i>
             <i className='fa-solid fa-forward musicControler' onClick={handleNextSong}></i>
           </div>
+          <button onClick={handleOverrideClick} className="addmusic-button">
+            {isOverrideMode ? 'Resume Scheduled Music' : 'Override Music'}
+          </button>
         </div>
+
+        {isModalOpen && (
+          <div className="music-modal">
+            <div className="music-modal-content">
+              <h3>Select Override Music</h3>
+              <ul className="music-list">
+                {musicAPI.map((song, i) => (
+                  <li key={i} className="music-item" onClick={() => handleSelectOverrideSong(song)}>
+                    {song.songName} - {song.songArtist}
+                  </li>
+                ))}
+              </ul>
+              <button className="addmusic-button" onClick={() => setIsModalOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
