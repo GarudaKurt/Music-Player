@@ -305,6 +305,8 @@ const handlePrevSong = () => {
           onEnded={handleNextSong}
           onTimeUpdate={handleAudioUpdate}
         />
+        <video src={ './Assets/Video/background.mp4'} loop muted autoPlay className='backgroundVideo'></video>
+
         <div className="blackScreen"></div>
         <div className="music-Container">
           <p className='musicPlayer'>Music Player</p>

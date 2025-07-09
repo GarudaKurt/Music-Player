@@ -21,10 +21,6 @@ body{
   align-items: center;
   color: var(--mainColor);
   font-family: 'Poppins';
-  background: linear-gradient(-45deg, #3e5151, #decba4, #b0c4de, #e0c3fc);
-  background-size: 400% 400%;
-  animation: gradientBG 20s ease infinite;
-  position: relative;
 }
 
 @keyframes gradientBG {

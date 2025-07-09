@@ -1,20 +1,22 @@
 [
   {
-    "id": 1752036515180,
-    "scheduleName": "First Prayer",
+    "id": 1752069963892,
+    "scheduleName": "Evening Prayers",
     "startDate": "2025-07-09",
     "endDate": "2025-07-09",
-    "startTime": "12:49",
-    "endTime": "13:00",
+    "startTime": "22:07",
+    "endTime": "22:15",
     "playlist": [
       {
-        "songName": "Music A",
-        "songSrc": "/songs/music_a.mp3",
+        "songName": "Music C",
+        "songArtist": "worship songs",
+        "songSrc": "/songs/music_c.mp3",
         "songAvatar": "./Assets/Images/image2.png"
       },
       {
-        "songName": "Music C",
-        "songSrc": "/songs/music_c.mp3",
+        "songName": "Music B",
+        "songArtist": "worship songs",
+        "songSrc": "/songs/music_b.mp3",
         "songAvatar": "./Assets/Images/image2.png"
       }
     ]

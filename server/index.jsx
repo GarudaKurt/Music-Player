@@ -86,8 +86,8 @@ app.post('/schedules', (req, res) => {
       startTime,
       endTime,
       playlist: songs.map(song => ({
-        songName: song.scheduleName,
-        songArtist: "Scheduled",
+        songName: song.songName,
+        songArtist: song.songArtist,
         songSrc: song.songSrc,
         songAvatar: song.songAvatar || './Assets/Images/image2.png'
       }))
