@@ -23,6 +23,8 @@ const Playlist = () => {
   const [isOverrideMode, setIsOverrideMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pausedScheduledDetails, setPausedScheduledDetails] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
 
   const avatarClass = ['objectFitCover', 'objectFitContain', 'none'];
   const currentAudio = useRef();
@@ -33,6 +35,14 @@ const Playlist = () => {
 
   const scheduledLoopStartTime = useRef(null);
   const scheduledLoopEndTime = useRef(null);
+
+  useEffect(() => {
+  const timer = setInterval(() => {
+    setCurrentTime(new Date());
+  }, 1000); // Update every second
+
+  return () => clearInterval(timer);
+}, []);
 
   useEffect(() => {
     const unlockAutoplay = () => {
@@ -306,7 +316,10 @@ const handlePrevSong = () => {
           onTimeUpdate={handleAudioUpdate}
         />
         <video src={ './Assets/Video/background.mp4'} loop muted autoPlay className='backgroundVideo'></video>
-
+        <div className="date-time-display">
+          <span>{currentTime.toLocaleDateString()}</span>
+          <span>{currentTime.toLocaleTimeString()}</span>
+        </div>
         <div className="blackScreen"></div>
         <div className="music-Container">
           <p className='musicPlayer'>Music Player</p>
