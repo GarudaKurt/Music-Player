@@ -1,38 +1,31 @@
+# 🎵 Music Player App by Client Edward
 
-# React JS Music Player | 🎧 
+##  How to Set Up This App
 
-Hey,
-I created a beast unique and dynamic music player that is fully customizable and user friendly. This Advance Music Player Application with React is best to quick start you learning journey for React JS beginners, also you can add this react project to your resume.
+Follow these steps to set up and run the Music Player app on your local machine.
 
-Here, This Music App contains all music player features to play audio/songs and also to change background video that gives a really good vibes and also the song avatar. 
-Watch Full Tutorial as this project is created from scratch, and this will really help you a lot!
+---
 
+### Steps:
 
+1. **Click "Code" on the top-right side of the repository**
+   
+   ![Step 1](https://github.com/user-attachments/assets/f1f4d890-ffb5-40d3-9578-3a0e1ff45c7a)
 
+2. **Select "Download ZIP"**
 
-[🔴 Youtube Tutorial Video](https://youtu.be/dALOX3sIfsk)
+   ![Step 2](https://github.com/user-attachments/assets/05ae256b-e600-465d-a07e-dabffd124821)
 
-[🔵 Live Project URL](https://t-musicplayer.netlify.app/)
+3. **Move the downloaded ZIP file to your Desktop**  
+   Right-click the file and select **"Extract All..."** to unzip the contents.
 
-If you want any answers related this project, You can Join My New Discord Server!
-Welcome!
+   ![Step 3](https://github.com/user-attachments/assets/49ebcf8d-9ef0-4bb0-a016-1ea8ee3aa27c)
 
-[🟣 Join Discord Server](https://discord.gg/G5zDJbVpMx)
+4. **Open Command Prompt in the extracted folder**  
+   Inside the extracted folder, click the file path bar (text in black). When it highlights in blue, type `cmd` and press **Enter**.
 
+   ![Step 4](https://github.com/user-attachments/assets/9a708c38-a591-45c8-9591-159b25bfb9b1)
 
-
-
-## Screenshot
-
-![App Screenshot](https://i.ibb.co/MSGBwTR/Thumbnail-10-K.png)
-
-
-## 🚀 About Me
-Teenage Programmer - Developing unique projects and trying to make web development learning easy to freshy users in this field. Fast track your development career with me. Hope you'll love my creativity.
-
-
-[SUBSCRIBE YOUTUBE](https://www.youtube.com/channel/UCHpW7UyMQf0SXpdO0obb1ig)
-
-
-![App Screenshot](https://yt3.ggpht.com/oGB27ubPR1zD7eqatjSUZRnMqdr1WAV6g3wC39d-G0hFTIrkzq0FK5_Z9sgAGQsTHEzOOgSw=s88-c-k-c0x00ffffff-no-rj)
-"# Music-Player" 
+5. **Run the front-end**
+   ```bash
+   npm start
