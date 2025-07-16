@@ -39,7 +39,7 @@ const Playlist = () => {
   useEffect(() => {
   const timer = setInterval(() => {
     setCurrentTime(new Date());
-  }, 1000); // Update every second
+  }, 1000);
 
   return () => clearInterval(timer);
 }, []);
@@ -143,7 +143,7 @@ useEffect(() => {
 
   useEffect(() => {
     const checkAndPlayScheduledSong = async () => {
-      if (isOverrideMode) return; // don't override if manual override is playing
+      if (isOverrideMode) return;
       try {
         const schedulesRes = await axios.get('http://localhost:5000/schedules');
         const schedules = schedulesRes.data;
@@ -240,7 +240,7 @@ const handleNextSong = () => {
 
   const newIndex = (musicIndex + 1) % musicAPI.length;
   setMusicIndex(newIndex);
-  updateCurrentMusicDetails(newIndex, true); // ✅ autoplay on navigation
+  updateCurrentMusicDetails(newIndex, true); // autoplay on navigation
 };
 
 
@@ -248,7 +248,7 @@ const handlePrevSong = () => {
   isScheduledPlaying.current = false;
   const newIndex = (musicIndex - 1 + musicAPI.length) % musicAPI.length;
   setMusicIndex(newIndex);
-  updateCurrentMusicDetails(newIndex, true); // ✅ autoplay on navigation
+  updateCurrentMusicDetails(newIndex, true); // autoplay on navigation
 };
 
 
@@ -315,7 +315,7 @@ const handlePrevSong = () => {
           onEnded={handleNextSong}
           onTimeUpdate={handleAudioUpdate}
         />
-        <video src={ './Assets/Video/background.mp4'} loop muted autoPlay className='backgroundVideo'></video>
+        <video src={ './Assets/Video/bg.mp4'} loop muted autoPlay className='backgroundVideo'></video>
         <div className="date-time-display">
           <span>{currentTime.toLocaleDateString()}</span>
           <span>{currentTime.toLocaleTimeString()}</span>
