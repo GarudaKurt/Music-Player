@@ -20,5 +20,49 @@
         "songAvatar": "./Assets/Images/image2.png"
       }
     ]
+  },
+  {
+    "id": 1752451416977,
+    "scheduleName": "Morning Prayers",
+    "startDate": "2025-07-14",
+    "endDate": "2025-07-14",
+    "startTime": "08:05",
+    "endTime": "08:30",
+    "playlist": [
+      {
+        "songName": "Music B",
+        "songArtist": "worship songs",
+        "songSrc": "/songs/music_b.mp3",
+        "songAvatar": "./Assets/Images/image2.png"
+      },
+      {
+        "songName": "Music C",
+        "songArtist": "worship songs",
+        "songSrc": "/songs/music_c.mp3",
+        "songAvatar": "./Assets/Images/image2.png"
+      }
+    ]
+  },
+  {
+    "id": 1752642149659,
+    "scheduleName": "Update Prayer",
+    "startDate": "2025-07-16",
+    "endDate": "2025-07-24",
+    "startTime": "13:04",
+    "endTime": "13:10",
+    "playlist": [
+      {
+        "songName": "Music A",
+        "songArtist": "Worship Songs",
+        "songSrc": "/songs/music_a.mp3",
+        "songAvatar": "./Assets/Images/image2.png"
+      },
+      {
+        "songName": "Music C",
+        "songArtist": "worship songs",
+        "songSrc": "/songs/music_c.mp3",
+        "songAvatar": "./Assets/Images/image2.png"
+      }
+    ]
   }
 ]

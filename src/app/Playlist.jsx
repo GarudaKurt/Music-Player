@@ -315,7 +315,7 @@ const handlePrevSong = () => {
           onEnded={handleNextSong}
           onTimeUpdate={handleAudioUpdate}
         />
-        <video src={ './Assets/Video/background.mp4'} loop muted autoPlay className='backgroundVideo'></video>
+        <video src={ './Assets/Video/bg.mp4'} loop muted autoPlay className='backgroundVideo'></video>
         <div className="date-time-display">
           <span>{currentTime.toLocaleDateString()}</span>
           <span>{currentTime.toLocaleTimeString()}</span>
