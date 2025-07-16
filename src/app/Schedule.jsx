@@ -1,5 +1,3 @@
-// ✅ Updated Schedule.jsx to support multiple music selection via checkboxes
-
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -94,7 +92,7 @@ const Schedule = () => {
     }
   });
 
-  setMessage("✅ Schedule saved successfully!");
+  setMessage("Schedule saved successfully!");
   setScheduleName('');
   setStartDate('');
   setEndDate('');
@@ -106,8 +104,8 @@ const Schedule = () => {
     navigate('/playlist');
   }, 5000);
 } catch (error) {
-  console.error("❌ Save error:", error);
-  setMessage("❌ Failed to save schedule.");
+  console.error(" Save error:", error);
+  setMessage("Failed to save schedule.");
 } finally {
   setSaving(false);
 }
