@@ -89,7 +89,7 @@ app.post('/schedules', (req, res) => {
         songName: song.songName,
         songArtist: song.songArtist,
         songSrc: song.songSrc,
-        songAvatar: song.songAvatar || './Assets/Images/image2.png'
+        songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
       }))
     };
 
@@ -118,6 +118,60 @@ app.get('/schedules', (req, res) => {
   const schedules = JSON.parse(fs.readFileSync(scheduleFile));
   res.json(schedules);
 });
+
+// Delete schedule by ID
+app.delete('/schedules/:id', (req, res) => {
+  const scheduleFile = path.join(__dirname, 'schedules.json');
+  const scheduleId = parseInt(req.params.id, 10);
+
+  if (!fs.existsSync(scheduleFile)) {
+    return res.status(404).json({ error: 'Schedule file not found' });
+  }
+
+  const schedules = JSON.parse(fs.readFileSync(scheduleFile));
+  const updatedSchedules = schedules.filter(sch => sch.id !== scheduleId);
+
+  if (schedules.length === updatedSchedules.length) {
+    return res.status(404).json({ error: 'Schedule not found' });
+  }
+
+  fs.writeFileSync(scheduleFile, JSON.stringify(updatedSchedules, null, 2));
+  console.log(`Deleted schedule with ID: ${scheduleId}`);
+  res.status(200).json({ message: 'Schedule deleted successfully' });
+});
+
+// Update schedule
+app.put('/schedules/:id', (req, res) => {
+  const scheduleFile = path.join(__dirname, 'schedules.json');
+  const scheduleId = parseInt(req.params.id, 10);
+  const updatedData = req.body;
+
+  if (!fs.existsSync(scheduleFile)) {
+    return res.status(404).json({ error: 'Schedule file not found' });
+  }
+
+  const schedules = JSON.parse(fs.readFileSync(scheduleFile));
+  const index = schedules.findIndex((s) => s.id === scheduleId);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Schedule not found' });
+  }
+
+  // Update only songs and leave other fields unchanged
+  schedules[index] = {
+    ...schedules[index],
+    ...updatedData,
+    playlist: updatedData.songs.map(song => ({
+      ...song,
+      songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
+    }))
+  };
+
+  fs.writeFileSync(scheduleFile, JSON.stringify(schedules, null, 2));
+  console.log(`Updated schedule ID ${scheduleId}`);
+  res.status(200).json({ message: 'Schedule updated successfully' });
+});
+
 
 // Start server
 app.listen(PORT, () => {
