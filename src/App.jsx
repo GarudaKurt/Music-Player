@@ -39,9 +39,10 @@ const App = () => {
 
           if (isWithinDate && isWithinTime) {
             // ✅ Navigate only if not already in /playlist
-            if (location.pathname !== '/playlist') {
+            if (['/'].includes(location.pathname)) {
               navigate('/playlist');
             }
+
             break; // stop after first valid schedule
           }
         }

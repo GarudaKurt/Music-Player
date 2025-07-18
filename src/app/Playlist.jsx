@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import '../App.css';
 import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 const Playlist = () => {
   const [musicAPI, setMusicAPI] = useState([]);
@@ -9,7 +10,7 @@ const Playlist = () => {
     songName: '',
     songArtist: '',
     songSrc: '',
-    songAvatar: './Assets/Images/profile.jpg'
+    songAvatar: './Assets/Images/image.png'
   });
   const [scheduledPlaylist, setScheduledPlaylist] = useState([]);
   const [scheduledSongIndex, setScheduledSongIndex] = useState(0);
@@ -18,7 +19,6 @@ const Playlist = () => {
   const [musicIndex, setMusicIndex] = useState(0);
   const [musicTotalLength, setMusicTotalLength] = useState('00 : 00');
   const [musicCurrentTime, setMusicCurrentTime] = useState('00 : 00');
-  const [videoIndex, setVideoIndex] = useState(0);
   const [avatarClassIndex, setAvatarClassIndex] = useState(0);
   const [hasEnded, setHasEnded] = useState(false);
   const [isOverrideMode, setIsOverrideMode] = useState(false);
@@ -28,8 +28,44 @@ const Playlist = () => {
 
   const navigate = useNavigate();
 
+  const location = useLocation();
+  const previousPathRef = useRef(location.pathname);
+
   const inactivityTimeoutRef = useRef(null);
   const lastPlayedTimestampRef = useRef(Date.now());
+
+  useEffect(() => {
+    const prev = previousPathRef.current;
+    const now = location.pathname;
+
+    // If we were on /playlist and now leaving
+    if (prev === '/playlist' && now !== '/playlist') {
+      if (isScheduledPlaying.current && !isOverrideMode) {
+        currentAudio.current.pause();
+        setPausedScheduledDetails(currentMusicDetails);
+        console.log('⏸ Music paused due to route change');
+      }
+    }
+
+    // If we are returning to /playlist and there’s paused music
+    if (prev !== '/playlist' && now === '/playlist') {
+      if (pausedScheduledDetails && !isOverrideMode) {
+        setCurrentMusicDetails(pausedScheduledDetails);
+        currentAudio.current.src = `http://localhost:5000${pausedScheduledDetails.songSrc}`;
+        currentAudio.current.load();
+        currentAudio.current.play().then(() => {
+          setIsAudioPlaying(true);
+          console.log('Resumed scheduled music after route return');
+          setPausedScheduledDetails(null);
+        }).catch(err => {
+          console.warn('Autoplay resume failed:', err.message);
+        });
+      }
+    }
+
+    previousPathRef.current = now;
+  }, [location.pathname]);
+
 
   useEffect(() => {
     const checkInactivity = setInterval(() => {
@@ -42,10 +78,10 @@ const Playlist = () => {
 
       // If no music playing and idle for 2 minutes, navigate home
       if (diff >= 2 * 60 * 1000 && noSchedulePlaying && noOverride && audioNotPlaying) {
-        console.warn('⏳ Inactive for 2 mins, navigating home...');
+        console.warn('Inactive for 2 mins, navigating home...');
         navigate('/');
       }
-    }, 5000); // check every 5 seconds
+    }, 5000);
 
     return () => clearInterval(checkInactivity);
   }, []);
@@ -67,7 +103,7 @@ const Playlist = () => {
     }, 1000);
     return () => {
       clearInterval(timer);
-      clearTimeout(inactivityTimeoutRef.current); // ✅ cleanup
+      clearTimeout(inactivityTimeoutRef.current);
     };
   }, []);
 
@@ -101,7 +137,7 @@ const Playlist = () => {
           if (currentAudio.current) {
             currentAudio.current.oncanplay = null;
             currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
-            currentAudio.current.load(); // ✅ load only, no autoplay
+            currentAudio.current.load();
           }
           setIsAudioPlaying(false);
         }
@@ -140,7 +176,7 @@ const Playlist = () => {
       songName: song.songName,
       songArtist: song.songArtist || scheduleName,
       songSrc: song.songSrc,
-      songAvatar: song.songAvatar || './Assets/Images/profile.png'
+      songAvatar: song.songAvatar || './Assets/Images/image.png'
     });
 
     audioEl.src = `http://localhost:5000${song.songSrc}`;
@@ -150,7 +186,7 @@ const Playlist = () => {
       audioEl.play().then(() => {
         console.log(`▶️ Playing: ${song.songName}`);
         setIsAudioPlaying(true);
-        lastPlayedTimestampRef.current = Date.now(); // ✅ update last played
+        lastPlayedTimestampRef.current = Date.now();
         clearTimeout(inactivityTimeoutRef.current);
       }).catch((err) => {
         console.warn('Autoplay error:', err.message);
@@ -158,7 +194,7 @@ const Playlist = () => {
         audioEl.play().then(() => {
           console.log('Muted autoplay fallback success');
           setIsAudioPlaying(true);
-          lastPlayedTimestampRef.current = Date.now(); // ✅
+          lastPlayedTimestampRef.current = Date.now();
           clearTimeout(inactivityTimeoutRef.current);
         }).catch((e) => {
           console.error('Even muted autoplay failed:', e.message);
@@ -259,8 +295,8 @@ const Playlist = () => {
     currentAudio.current.load();
     currentAudio.current.play();
     setIsAudioPlaying(true);
-    lastPlayedTimestampRef.current = Date.now(); // ✅ update time
-    clearTimeout(inactivityTimeoutRef.current);  // ✅ stop timer
+    lastPlayedTimestampRef.current = Date.now();
+    clearTimeout(inactivityTimeoutRef.current);
     setIsOverrideMode(true);
     setIsModalOpen(false);
   };
@@ -309,8 +345,8 @@ const Playlist = () => {
         currentAudio.current.play()
           .then(() => {
             setIsAudioPlaying(true);
-            lastPlayedTimestampRef.current = Date.now();  // ✅ update time
-            clearTimeout(inactivityTimeoutRef.current);   // ✅ stop timer
+            lastPlayedTimestampRef.current = Date.now();
+            clearTimeout(inactivityTimeoutRef.current);
           })
           .catch(err => console.warn('Play error:', err.message));
       }
@@ -333,8 +369,8 @@ const Playlist = () => {
     if (currentAudio.current.paused) {
       currentAudio.current.play();
       setIsAudioPlaying(true);
-      lastPlayedTimestampRef.current = Date.now(); // ✅ update time
-      clearTimeout(inactivityTimeoutRef.current); // ✅ stop timer
+      lastPlayedTimestampRef.current = Date.now();
+      clearTimeout(inactivityTimeoutRef.current);
     } else {
       currentAudio.current.pause();
       setIsAudioPlaying(false);
@@ -355,7 +391,6 @@ const Playlist = () => {
   };
 
 
-
   return (
     <>
       <div className="container">
@@ -374,7 +409,7 @@ const Playlist = () => {
           <p className='music-Head-Name'>{currentMusicDetails.songName}</p>
           <p className='music-Artist-Name'>{currentMusicDetails.songArtist}</p>
           <img
-            src={currentMusicDetails.songAvatar || './Assets/Images/profile.jpg'}
+            src={currentMusicDetails.songAvatar || './Assets/Images/imange.png'}
             className={avatarClass[avatarClassIndex]}
             onClick={handleAvatar}
             alt="song Avatar"

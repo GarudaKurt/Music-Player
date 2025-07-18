@@ -44,7 +44,7 @@ body{
   position: absolute;
   top: 0;
   left: 0;
-  background-image: url('/public/Assets/Images/bg.jpg'); /* no /public */
+  background-image: url('/public/Assets/Images/profile.jpg'); /* no /public */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

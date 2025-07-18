@@ -89,7 +89,7 @@ app.post('/schedules', (req, res) => {
         songName: song.songName,
         songArtist: song.songArtist,
         songSrc: song.songSrc,
-        songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
+        songAvatar: song.songAvatar || './Assets/Images/image.png'
       }))
     };
 
@@ -157,13 +157,12 @@ app.put('/schedules/:id', (req, res) => {
     return res.status(404).json({ error: 'Schedule not found' });
   }
 
-  // Update only songs and leave other fields unchanged
   schedules[index] = {
     ...schedules[index],
     ...updatedData,
     playlist: updatedData.songs.map(song => ({
       ...song,
-      songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
+      songAvatar: song.songAvatar || './Assets/Images/image.png'
     }))
   };
 
