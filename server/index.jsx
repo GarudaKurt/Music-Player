@@ -89,7 +89,7 @@ app.post('/schedules', (req, res) => {
         songName: song.songName,
         songArtist: song.songArtist,
         songSrc: song.songSrc,
-        songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
+        songAvatar: song.songAvatar || './Assets/Images/image.png'
       }))
     };
 
@@ -162,7 +162,7 @@ app.put('/schedules/:id', (req, res) => {
     ...updatedData,
     playlist: updatedData.songs.map(song => ({
       ...song,
-      songAvatar: song.songAvatar || './Assets/Images/profile.jpg'
+      songAvatar: song.songAvatar || './Assets/Images/image.png'
     }))
   };
 
