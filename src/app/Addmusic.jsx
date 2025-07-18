@@ -76,7 +76,7 @@ const Addmusic = () => {
   return (
     <div className="addmusic-container">
       <h2 className="addmusic-heading">🎵 Add New Music</h2>
-      
+
       {message && (
         <div className="message-box fade-out">
           {message}
