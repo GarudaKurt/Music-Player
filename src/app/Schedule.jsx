@@ -75,6 +75,20 @@ const Schedule = () => {
     fetchAvailableMusics();
     setShowModal(true);
   };
+  const handleDeleteSong = async (song) => {
+    if (!window.confirm(`Are you sure you want to delete "${song.songName}"?`)) return;
+
+    try {
+      const filename = song.songSrc.split('/').pop(); // extract "filename.mp3"
+      await axios.delete(`http://localhost:5000/songs/${filename}`);
+      setAvailableMusics((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
+      setSelectedSongs((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
+      setMessage(`🗑️ Deleted: ${song.songName}`);
+    } catch (error) {
+      console.error("Delete error:", error);
+      setMessage("Failed to delete song");
+    }
+  };
 
   useEffect(() => {
     if (message) {
@@ -200,9 +214,25 @@ const Schedule = () => {
                       ({songDurations[song.songSrc] || '...'})
                     </span>
                   </label>
+
+                  <button
+                    onClick={() => handleDeleteSong(song)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'red',
+                      fontSize: '1.2em',
+                      marginLeft: '12px',
+                      cursor: 'pointer'
+                    }}
+                    title="Delete song"
+                  >
+                    🗑️
+                  </button>
                 </li>
               ))}
             </ul>
+
 
             <button onClick={() => setShowModal(false)} className="addmusic-button">
               Done
