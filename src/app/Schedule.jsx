@@ -11,8 +11,10 @@ const Schedule = () => {
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [selectedSongs, setSelectedSongs] = useState([]); // multiple selection
+  const [selectedSongs, setSelectedSongs] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [songDurations, setSongDurations] = useState({});
+
 
   const [showModal, setShowModal] = useState(false);
   const [availableMusics, setAvailableMusics] = useState([]);
@@ -24,12 +26,41 @@ const Schedule = () => {
   const fetchAvailableMusics = async () => {
     try {
       const res = await axios.get("http://localhost:5000/songs-list");
-      setAvailableMusics(res.data);
+      const songs = res.data;
+      setAvailableMusics(songs);
+
+      const durations = {};
+      const promises = songs.map((song) => {
+        return new Promise((resolve) => {
+          const audio = new Audio(`http://localhost:5000${song.songSrc}`);
+          audio.addEventListener('loadedmetadata', () => {
+            durations[song.songSrc] = formatDuration(audio.duration);
+            resolve();
+          });
+          audio.addEventListener('error', () => {
+            durations[song.songSrc] = "N/A";
+            resolve();
+          });
+        });
+      });
+
+      await Promise.all(promises);
+      setSongDurations(durations);
+
     } catch (err) {
       console.error("Error fetching songs:", err);
       setMessage("Failed to fetch songs.");
     }
   };
+
+  const formatDuration = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "N/A";
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${min}:${sec}`;
+  };
+
+
 
   const toggleSongSelection = (song) => {
     const exists = selectedSongs.find((s) => s.songSrc === song.songSrc);
@@ -55,7 +86,7 @@ const Schedule = () => {
   useEffect(() => {
     const resetTimer = () => {
       clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = setTimeout(() => navigate("/playlist"), 30000);
+      idleTimerRef.current = setTimeout(() => navigate("/"), 30000);
     };
 
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
@@ -76,41 +107,45 @@ const Schedule = () => {
       return;
     }
 
- try {
-  setSaving(true);
+    try {
+      setSaving(true);
 
-  const schedulePayload = {
-    scheduleName,
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-    songs: selectedSongs
-  };
+      const schedulePayload = {
+        scheduleName,
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        songs: selectedSongs
+      };
 
-  await axios.post("http://localhost:5000/schedules", schedulePayload, {
-    headers: {
-      'Content-Type': 'application/json'
+      await axios.post("http://localhost:5000/schedules", schedulePayload, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      setMessage("Schedule saved successfully!");
+      setScheduleName('');
+      setStartDate('');
+      setEndDate('');
+      setStartTime('');
+      setEndTime('');
+      setSelectedSongs([]);
+
+      setTimeout(() => {
+        navigate('/');
+      }, 5000);
+    } catch (error) {
+      console.error("Save error:", error);
+      if (error.response && error.response.status === 409) {
+        setMessage("⚠️ Schedule conflict: overlaps with an existing schedule.");
+      } else {
+        setMessage("Failed to save schedule.");
+      }
+    } finally {
+      setSaving(false);
     }
-  });
-
-  setMessage("Schedule saved successfully!");
-  setScheduleName('');
-  setStartDate('');
-  setEndDate('');
-  setStartTime('');
-  setEndTime('');
-  setSelectedSongs([]);
-
-  setTimeout(() => {
-    navigate('/playlist');
-  }, 5000);
-} catch (error) {
-  console.error(" Save error:", error);
-  setMessage("Failed to save schedule.");
-} finally {
-  setSaving(false);
-}
 
   };
 
@@ -161,10 +196,14 @@ const Schedule = () => {
                       onChange={() => toggleSongSelection(song)}
                     />
                     🎵 {song.songName} — <em>{song.songArtist}</em>
+                    <span style={{ marginLeft: '8px', color: '#888' }}>
+                      ({songDurations[song.songSrc] || '...'})
+                    </span>
                   </label>
                 </li>
               ))}
             </ul>
+
             <button onClick={() => setShowModal(false)} className="addmusic-button">
               Done
             </button>

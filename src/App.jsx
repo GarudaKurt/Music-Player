@@ -38,12 +38,11 @@ const App = () => {
           const isWithinTime = now >= startTime && now <= endTime;
 
           if (isWithinDate && isWithinTime) {
-            // ✅ Navigate only if not already in /playlist
             if (['/'].includes(location.pathname)) {
               navigate('/playlist');
             }
 
-            break; // stop after first valid schedule
+            break;
           }
         }
       } catch (err) {
@@ -52,7 +51,7 @@ const App = () => {
     };
 
     checkIncomingSchedule();
-    const interval = setInterval(checkIncomingSchedule, 10000); // check every 10s
+    const interval = setInterval(checkIncomingSchedule, 10000);
 
     return () => clearInterval(interval);
   }, [location.pathname, navigate]);

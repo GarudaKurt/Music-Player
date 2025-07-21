@@ -569,6 +569,7 @@ body{
   animation: fadeMessage 5s forwards;
 }
 
+
 @keyframes fadeMessage {
   0% { opacity: 1; }
   80% { opacity: 1; }

@@ -131,7 +131,9 @@ const Playlist = () => {
     axios.get('http://localhost:5000/songs-list')
       .then(res => {
         setMusicAPI(res.data);
-        if (res.data.length > 0) {
+
+        // Only preload default song if no schedule is playing
+        if (res.data.length > 0 && !isScheduledPlaying.current) {
           const firstSong = res.data[0];
           setCurrentMusicDetails(firstSong);
           if (currentAudio.current) {
@@ -144,6 +146,7 @@ const Playlist = () => {
       })
       .catch(err => console.error('Failed to fetch songs:', err));
   }, []);
+
 
 
   useEffect(() => {
@@ -409,7 +412,7 @@ const Playlist = () => {
           <p className='music-Head-Name'>{currentMusicDetails.songName}</p>
           <p className='music-Artist-Name'>{currentMusicDetails.songArtist}</p>
           <img
-            src={currentMusicDetails.songAvatar || './Assets/Images/imange.png'}
+            src={currentMusicDetails.songAvatar || './Assets/Images/image.png'}
             className={avatarClass[avatarClassIndex]}
             onClick={handleAvatar}
             alt="song Avatar"
