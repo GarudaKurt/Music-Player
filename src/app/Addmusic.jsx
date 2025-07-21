@@ -24,7 +24,7 @@ const Addmusic = () => {
     const resetTimer = () => {
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
-        navigate('/playlist');
+        navigate('/');
       }, 30000); // 30 seconds idle
     };
 
