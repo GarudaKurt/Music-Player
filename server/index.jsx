@@ -78,6 +78,27 @@ app.post('/schedules', (req, res) => {
       return res.status(400).json({ error: 'Missing required fields or empty song list' });
     }
 
+    const newStart = new Date(`${startDate}T${startTime}`);
+    const newEnd = new Date(`${endDate}T${endTime}`);
+
+    const dataFile = path.join(__dirname, 'schedules.json');
+    const existing = fs.existsSync(dataFile)
+      ? JSON.parse(fs.readFileSync(dataFile))
+      : [];
+
+    // Check for time conflicts
+    const hasConflict = existing.some(s => {
+      const existingStart = new Date(`${s.startDate}T${s.startTime}`);
+      const existingEnd = new Date(`${s.endDate}T${s.endTime}`);
+      return (
+        (newStart < existingEnd) && (newEnd > existingStart)
+      );
+    });
+
+    if (hasConflict) {
+      return res.status(409).json({ error: 'Schedule conflict: Time overlaps with existing schedule' });
+    }
+
     const scheduleData = {
       id: Date.now(),
       scheduleName,
@@ -93,16 +114,11 @@ app.post('/schedules', (req, res) => {
       }))
     };
 
-    const dataFile = path.join(__dirname, 'schedules.json');
-    const existing = fs.existsSync(dataFile)
-      ? JSON.parse(fs.readFileSync(dataFile))
-      : [];
-
     existing.push(scheduleData);
     fs.writeFileSync(dataFile, JSON.stringify(existing, null, 2));
 
-    console.log(`Scheduled playlist: ${scheduleName} with ${songs.length} songs`);
-    res.status(201).json({ message: 'Schedule saved with multiple songs', schedule: scheduleData });
+    console.log(`✅ Scheduled playlist: ${scheduleName}`);
+    res.status(201).json({ message: 'Schedule saved successfully', schedule: scheduleData });
 
   } catch (err) {
     console.error("Internal server error in /schedules:", err);
