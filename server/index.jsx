@@ -187,6 +187,28 @@ app.put('/schedules/:id', (req, res) => {
   res.status(200).json({ message: 'Schedule updated successfully' });
 });
 
+app.delete('/songs/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const songPath = path.join(uploadPath, filename);
+  const dataFile = path.join(__dirname, 'songs.json');
+
+  // Delete song file
+  if (fs.existsSync(songPath)) {
+    fs.unlinkSync(songPath);
+  }
+
+  // Remove from songs.json
+  if (fs.existsSync(dataFile)) {
+    const songs = JSON.parse(fs.readFileSync(dataFile));
+    const updatedSongs = songs.filter(song => !song.songSrc.endsWith(`/${filename}`));
+    fs.writeFileSync(dataFile, JSON.stringify(updatedSongs, null, 2));
+    console.log(`Deleted song: ${filename}`);
+    return res.status(200).json({ message: 'Song deleted' });
+  }
+
+  return res.status(404).json({ error: 'Song not found' });
+});
+
 
 // Start server
 app.listen(PORT, () => {
