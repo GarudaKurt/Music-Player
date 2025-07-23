@@ -166,6 +166,12 @@ const Playlist = () => {
         setIsAudioPlaying(false);
         setScheduledPlaylist([]);
         setScheduledSongIndex(0);
+        navigate("/")
+        if (currentAudio.current) {
+          currentAudio.current.pause();
+          currentAudio.current.currentTime = 0;
+          currentAudio.current.src = "";
+        }
       }
     }, 5000);
     return () => clearInterval(checkScheduledTimeout);
