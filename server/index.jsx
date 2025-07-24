@@ -71,32 +71,64 @@ app.post('/schedules', (req, res) => {
       endDate,
       startTime,
       endTime,
-      songs
+      songs,
+      repeatType = "none", // none | weekly | monthly
+      weekdays = [] // Only used if repeatType is weekly
     } = req.body;
 
-    if (!scheduleName || !startDate || !endDate || !startTime || !endTime || !Array.isArray(songs) || songs.length === 0) {
-      return res.status(400).json({ error: 'Missing required fields or empty song list' });
+    if (
+      !scheduleName || !startTime || !endTime ||
+      !Array.isArray(songs) || songs.length === 0 ||
+      !startDate || !endDate
+    ) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const newStart = new Date(`${startDate}T${startTime}`);
-    const newEnd = new Date(`${endDate}T${endTime}`);
+    if (repeatType === 'weekly' && weekdays.length === 0) {
+      return res.status(400).json({ error: 'Weekly repeat selected but no weekdays provided' });
+    }
 
-    const dataFile = path.join(__dirname, 'schedules.json');
-    const existing = fs.existsSync(dataFile)
-      ? JSON.parse(fs.readFileSync(dataFile))
-      : [];
+    const scheduleFile = path.join(__dirname, 'schedules.json');
+    const existing = fs.existsSync(scheduleFile) ? JSON.parse(fs.readFileSync(scheduleFile)) : [];
 
-    // Check for time conflicts
-    const hasConflict = existing.some(s => {
-      const existingStart = new Date(`${s.startDate}T${s.startTime}`);
-      const existingEnd = new Date(`${s.endDate}T${s.endTime}`);
-      return (
-        (newStart < existingEnd) && (newEnd > existingStart)
-      );
-    });
+    // Helper: Convert day string to number (Mon -> 1, Sun -> 0)
+    const weekdayMap = {
+      'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3,
+      'Thu': 4, 'Fri': 5, 'Sat': 6
+    };
 
-    if (hasConflict) {
-      return res.status(409).json({ error: 'Schedule conflict: Time overlaps with existing schedule' });
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const occurrences = [];
+
+    let current = new Date(start);
+
+    while (current <= end) {
+      const day = current.getDay(); // 0 (Sun) to 6 (Sat)
+      const dayName = Object.keys(weekdayMap).find(k => weekdayMap[k] === day);
+
+      if (
+        repeatType === 'none' ||
+        (repeatType === 'weekly' && weekdays.includes(dayName)) ||
+        (repeatType === 'monthly' && current.getDate() === start.getDate())
+      ) {
+        const occurrenceStart = new Date(current);
+        occurrenceStart.setHours(...startTime.split(':').map(Number));
+        const occurrenceEnd = new Date(current);
+        occurrenceEnd.setHours(...endTime.split(':').map(Number));
+
+        occurrences.push({
+          date: current.toISOString().split('T')[0],
+          startTime,
+          endTime
+        });
+      }
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (occurrences.length === 0) {
+      return res.status(400).json({ error: 'No valid occurrences within the selected range.' });
     }
 
     const scheduleData = {
@@ -106,6 +138,9 @@ app.post('/schedules', (req, res) => {
       endDate,
       startTime,
       endTime,
+      repeatType, // none | weekly | monthly
+      weekdays,
+      occurrences,
       playlist: songs.map(song => ({
         songName: song.songName,
         songArtist: song.songArtist,
@@ -114,8 +149,23 @@ app.post('/schedules', (req, res) => {
       }))
     };
 
+    // Check for time conflicts
+    const hasConflict = existing.some(sch => {
+      return sch.occurrences.some(existingOcc => {
+        return occurrences.some(newOcc => (
+          existingOcc.date === newOcc.date &&
+          newOcc.startTime < existingOcc.endTime &&
+          newOcc.endTime > existingOcc.startTime
+        ));
+      });
+    });
+
+    if (hasConflict) {
+      return res.status(409).json({ error: 'Schedule conflict: Time overlaps with existing schedule' });
+    }
+
     existing.push(scheduleData);
-    fs.writeFileSync(dataFile, JSON.stringify(existing, null, 2));
+    fs.writeFileSync(scheduleFile, JSON.stringify(existing, null, 2));
 
     console.log(`✅ Scheduled playlist: ${scheduleName}`);
     res.status(201).json({ message: 'Schedule saved successfully', schedule: scheduleData });
@@ -125,7 +175,6 @@ app.post('/schedules', (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
 
 // Get schedules
 app.get('/schedules', (req, res) => {
@@ -177,10 +226,13 @@ app.put('/schedules/:id', (req, res) => {
     ...schedules[index],
     ...updatedData,
     playlist: updatedData.songs.map(song => ({
-      ...song,
+      songName: song.songName,
+      songArtist: song.songArtist,
+      songSrc: song.songSrc,
       songAvatar: song.songAvatar || './Assets/Images/image.png'
     }))
   };
+
 
   fs.writeFileSync(scheduleFile, JSON.stringify(schedules, null, 2));
   console.log(`Updated schedule ID ${scheduleId}`);
