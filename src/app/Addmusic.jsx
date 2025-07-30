@@ -53,7 +53,7 @@ const Addmusic = () => {
 
     try {
       setUploading(true);
-      await axios.post("http://localhost:5000/uploads", formData, {
+      await axios.post("http://192.168.99.142:5000/uploads", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

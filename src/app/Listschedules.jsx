@@ -28,7 +28,7 @@ const SchedulesMusic = () => {
 
   const handleEdit = async (schedule) => {
     try {
-      const res = await axios.get("http://localhost:5000/songs-list");
+      const res = await axios.get("http://192.168.99.142:5000/songs-list");
       setAvailableMusics(res.data);
       setSelectedSchedule(schedule);
       setSelectedSongs(schedule.playlist); // prefill current songs
@@ -47,7 +47,7 @@ const SchedulesMusic = () => {
         songs: selectedSongs
       };
 
-      await axios.put(`http://localhost:5000/schedules/${selectedSchedule.id}`, updatedSchedule, {
+      await axios.put(`'ttp://192.168.99.142:5000/schedules/${selectedSchedule.id}`, updatedSchedule, {
         headers: { 'Content-Type': 'application/json' }
       });
 
@@ -72,7 +72,7 @@ const SchedulesMusic = () => {
   const handleDelete = async (scheduleId) => {
     if (window.confirm('Are you sure you want to delete this schedule?')) {
       try {
-        await axios.delete(`http://localhost:5000/schedules/${scheduleId}`);
+        await axios.delete(`http://192.168.99.142:5000/schedules/${scheduleId}`);
         fetchSchedules(); // Refresh list
       } catch (err) {
         console.error('Failed to delete schedule:', err);
@@ -82,7 +82,7 @@ const SchedulesMusic = () => {
 
   const fetchSchedules = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/schedules');
+      const res = await axios.get('http://192.168.99.142:5000/schedules');
       const { monday, sunday } = getWeekRange(weekOffset);
 
       const filtered = res.data.filter(schedule => {

@@ -298,8 +298,8 @@ app.post('/manual-play', (req, res) => {
 
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on...`);
 });
 
 setInterval(() => {
@@ -323,7 +323,7 @@ setInterval(() => {
 
       if (diffStart < 5000) {
         console.log(`Schedule "${schedule.scheduleName}" starts soon! Turning amplifier ON`);
-        port.write("1\n"); // Arduino receives 1 to turn ON
+        port.write("0\n"); // Arduino receives  to turn ON
       }
 
       // OFF: when scheduled end hits
@@ -331,7 +331,7 @@ setInterval(() => {
 
       if (diffEnd < 5000) {
         console.log(`Schedule "${schedule.scheduleName}" ended. Turning amplifier OFF`);
-        port.write("0\n"); // Arduino receives 0 to turn OFF
+        port.write("1\n"); // Arduino receives 0 to turn OFF
       }
     });
   });

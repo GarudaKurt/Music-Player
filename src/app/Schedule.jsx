@@ -32,14 +32,14 @@ const Schedule = () => {
 
   const fetchAvailableMusics = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/songs-list");
+      const res = await axios.get("http://192.168.99.142:5000/songs-list");
       const songs = res.data;
       setAvailableMusics(songs);
 
       const durations = {};
       const promises = songs.map((song) => {
         return new Promise((resolve) => {
-          const audio = new Audio(`http://localhost:5000${song.songSrc}`);
+          const audio = new Audio(`http://192.168.99.142:5000${song.songSrc}`);
           audio.addEventListener('loadedmetadata', () => {
             durations[song.songSrc] = formatDuration(audio.duration);
             resolve();
@@ -87,7 +87,7 @@ const Schedule = () => {
 
     try {
       const filename = song.songSrc.split('/').pop(); // extract "filename.mp3"
-      await axios.delete(`http://localhost:5000/songs/${filename}`);
+      await axios.delete(`http://192.168.99.142:5000/songs/${filename}`);
       setAvailableMusics((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
       setSelectedSongs((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
       setMessage(`🗑️ Deleted: ${song.songName}`);
@@ -143,7 +143,7 @@ const Schedule = () => {
         monthDates: repeatType === 'monthly' ? selectedDates : []
       };
 
-      await axios.post("http://localhost:5000/schedules", schedulePayload, {
+      await axios.post("http://192.168.99.142:5000/schedules", schedulePayload, {
         headers: {
           'Content-Type': 'application/json'
         }
