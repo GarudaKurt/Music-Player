@@ -14,6 +14,13 @@ const Schedule = () => {
   const [selectedSongs, setSelectedSongs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [songDurations, setSongDurations] = useState({});
+  const [showRepeatModal, setShowRepeatModal] = useState(false);
+  const [repeatType, setRepeatType] = useState("none"); // or "monthly"
+
+  const [selectedDays, setSelectedDays] = useState([]);   // Mon–Sun
+  const [selectedDates, setSelectedDates] = useState([]); // 1–31
+
+
 
 
   const [showModal, setShowModal] = useState(false);
@@ -75,6 +82,20 @@ const Schedule = () => {
     fetchAvailableMusics();
     setShowModal(true);
   };
+  const handleDeleteSong = async (song) => {
+    if (!window.confirm(`Are you sure you want to delete "${song.songName}"?`)) return;
+
+    try {
+      const filename = song.songSrc.split('/').pop(); // extract "filename.mp3"
+      await axios.delete(`http://localhost:5000/songs/${filename}`);
+      setAvailableMusics((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
+      setSelectedSongs((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
+      setMessage(`🗑️ Deleted: ${song.songName}`);
+    } catch (error) {
+      console.error("Delete error:", error);
+      setMessage("Failed to delete song");
+    }
+  };
 
   useEffect(() => {
     if (message) {
@@ -116,7 +137,10 @@ const Schedule = () => {
         endDate,
         startTime,
         endTime,
-        songs: selectedSongs
+        songs: selectedSongs,
+        repeatType,
+        weekdays: repeatType === 'weekly' ? selectedDays : [],
+        monthDates: repeatType === 'monthly' ? selectedDates : []
       };
 
       await axios.post("http://localhost:5000/schedules", schedulePayload, {
@@ -132,6 +156,9 @@ const Schedule = () => {
       setStartTime('');
       setEndTime('');
       setSelectedSongs([]);
+      setSelectedDays([]);
+      setSelectedDates([]);
+      setRepeatType('none');
 
       setTimeout(() => {
         navigate('/');
@@ -146,7 +173,6 @@ const Schedule = () => {
     } finally {
       setSaving(false);
     }
-
   };
 
   return (
@@ -172,6 +198,101 @@ const Schedule = () => {
           <label>Start Date:<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="addmusic-input" /></label>
           <label>End Date:<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="addmusic-input" /></label>
         </div>
+        <div className="input-row">
+          <select
+            value={repeatType || "none"}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "weekly" || value === "monthly") {
+                setRepeatType(value);
+                setShowRepeatModal(true);
+              } else {
+                setShowRepeatModal(false);
+              }
+            }}
+            className="addmusic-input"
+          >
+            <option value="none">No Repeat</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+
+
+        </div>
+
+        {showRepeatModal && (
+          <div className="day-modal-overlay">
+            <div className="weekly-scheduler-modal">
+              <h3 className="text-lg font-bold mb-4">Repeat Schedule</h3>
+
+              {/* Toggle Weekly/Monthly */}
+              <select
+                className="select select-bordered mb-4 w-full"
+                value={repeatType}
+                onChange={(e) => setRepeatType(e.target.value)}
+              >
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+
+              {/* Weekly View */}
+              {repeatType === "weekly" && (
+                <div className="day-checkboxes">
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                    <label key={day} style={{ margin: "5px", display: "inline-block", width: "60px" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDays.includes(day)}
+                        onChange={() =>
+                          setSelectedDays((prev) =>
+                            prev.includes(day)
+                              ? prev.filter((d) => d !== day)
+                              : [...prev, day]
+                          )
+                        }
+                      />
+                      {day}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* Monthly View */}
+              {repeatType === "monthly" && (
+                <div className="day-checkboxes">
+                  {[...Array(31)].map((_, index) => {
+                    const day = index + 1;
+                    return (
+                      <label key={day} style={{ margin: "5px", display: "inline-block", width: "50px" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDates.includes(day)}
+                          onChange={() =>
+                            setSelectedDates((prev) =>
+                              prev.includes(day)
+                                ? prev.filter((d) => d !== day)
+                                : [...prev, day]
+                            )
+                          }
+                        />
+                        {day}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="modal-buttons mt-6">
+                <button className="btn-cancel" onClick={() => setShowRepeatModal(false)}>
+                  Cancel
+                </button>
+                <button className="addmusic-button" onClick={() => setShowRepeatModal(false)}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button type="button" className="addmusic-button" onClick={openModal}>
           {selectedSongs.length > 0 ? `🎵 ${selectedSongs.length} song(s) selected` : "Select Music"}
@@ -200,9 +321,25 @@ const Schedule = () => {
                       ({songDurations[song.songSrc] || '...'})
                     </span>
                   </label>
+
+                  <button
+                    onClick={() => handleDeleteSong(song)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'red',
+                      fontSize: '1.2em',
+                      marginLeft: '12px',
+                      cursor: 'pointer'
+                    }}
+                    title="Delete song"
+                  >
+                    🗑️
+                  </button>
                 </li>
               ))}
             </ul>
+
 
             <button onClick={() => setShowModal(false)} className="addmusic-button">
               Done

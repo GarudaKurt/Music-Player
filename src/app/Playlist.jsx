@@ -166,6 +166,13 @@ const Playlist = () => {
         setIsAudioPlaying(false);
         setScheduledPlaylist([]);
         setScheduledSongIndex(0);
+        navigate("/")
+        if (currentAudio.current) {
+          currentAudio.current.pause();
+          currentAudio.current.currentTime = 0;
+          currentAudio.current.src = "";
+        }
+
       }
     }, 5000);
     return () => clearInterval(checkScheduledTimeout);
@@ -368,17 +375,32 @@ const Playlist = () => {
     setAvatarClassIndex((prev) => (prev + 1) % avatarClass.length);
   };
 
-  const handleAudioPlay = () => {
+  const handleAudioPlay = async () => {
     if (currentAudio.current.paused) {
+      try {
+        await axios.post('http://localhost:5000/manual-play', { action: 'play' });
+        console.log('Sent play signal to server');
+      } catch (err) {
+        console.error('Failed to send play signal:', err);
+      }
+
       currentAudio.current.play();
       setIsAudioPlaying(true);
       lastPlayedTimestampRef.current = Date.now();
       clearTimeout(inactivityTimeoutRef.current);
     } else {
+      try {
+        await axios.post('http://localhost:5000/manual-play', { action: 'pause' });
+        console.log('Sent pause signal to server');
+      } catch (err) {
+        console.error('Failed to send pause signal:', err);
+      }
+
       currentAudio.current.pause();
       setIsAudioPlaying(false);
     }
   };
+
 
   const handleAudioUpdate = () => {
     const duration = currentAudio.current.duration || 0;
