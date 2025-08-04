@@ -57,7 +57,9 @@ body{
 .overlay-content {
   position: relative;
   height: 100%;
+  min-height: 600px;
   width: 100%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -521,6 +523,354 @@ body{
   }
 }
 
+@media (max-width: 1024px) and (max-height: 600px) {
+  .addmusic-container {
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 100vh;
+  }
+
+  .addmusic-heading {
+    font-size: 1.5rem;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .addmusic-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .input-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .addmusic-input {
+    font-size: 0.95rem;
+    padding: 8px;
+  }
+
+  .addmusic-button {
+    font-size: 0.95rem;
+    padding: 0.6rem 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .message-box {
+    font-size: 0.9rem;
+    padding: 8px;
+    margin-bottom: 12px;
+  }
+
+  .music-modal-content {
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+
+  .music-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .music-item {
+    padding: 6px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .weekly-scheduler-modal {
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .day-checkboxes label {
+    width: 55px;
+    font-size: 0.85rem;
+    margin: 3px;
+  }
+
+  .select {
+    font-size: 0.9rem;
+  }
+
+  .btn-cancel {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.8rem;
+    background-color: #eee;
+  }
+
+  .modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 1024px) and (max-height: 600px) {
+  .schedules-container {
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 100vh;
+  }
+
+  .title {
+    font-size: 1.5rem;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .week-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+  }
+
+  .week-nav button {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+
+  .schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  .schedule-card {
+    padding: 12px;
+    background-color: #333;
+    color: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+
+  .schedule-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+  }
+
+  .songs-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .song-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: #444;
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    width: 100%;
+  }
+
+  .song-item img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .music-modal-content {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+
+  .music-list {
+    max-height: 45vh;
+    overflow-y: auto;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .music-item {
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+  }
+
+  .modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    gap: 10px;
+  }
+
+  .addmusic-button,
+  .btn-cancel {
+    font-size: 0.85rem;
+    padding: 0.5rem 1rem;
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) and (max-height: 600px) {
+  .addmusic-container {
+    padding: 12px;
+    max-width: 100%;
+    overflow-y: auto;
+    max-height: 100vh;
+  }
+
+  .addmusic-heading {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .message-box {
+    font-size: 0.95rem;
+    padding: 10px;
+    margin-bottom: 1rem;
+    background-color: #333;
+    color: white;
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .addmusic-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .addmusic-input {
+    padding: 10px;
+    font-size: 0.95rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    width: 100%;
+  }
+
+  .addmusic-button {
+    padding: 10px;
+    font-size: 1rem;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .addmusic-button:disabled {
+    background-color: #888;
+    cursor: not-allowed;
+  }
+}
+
+@media (max-width: 1024px) and (max-height: 600px) {
+  .container {
+    flex-direction: column;
+    padding: 0.5rem;
+    overflow-y: auto;
+    height: auto;
+  }
+
+  .music-Container {
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  #songAvatar {
+    width: 120px;
+    height: 120px;
+  }
+
+  .music-Head-Name {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+  }
+
+  .music-Artist-Name {
+   font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+  }
+
+  .musicControlers i {
+    font-size: 24px;
+    margin: 6px;
+  }
+
+  .addmusic-button {
+    font-size: 0.95rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .music-modal-content {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .music-item {
+    font-size: 0.85rem;
+  }
+}
+
+
+@media (max-width: 1024px) and (max-height: 600px) {
+  .date-time-center {
+    font-size: 1.5rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .bottomNav {
+    height: 50px;
+    max-width: 100%;
+    font-size: 0.7rem;
+    gap: 4px;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .nav-label {
+    font-size: 0.6rem;
+  }
+
+  .music-Container {
+    width: 90%;
+    padding: 20px;
+  }
+
+  .hamburger {
+    padding: 8px 10px;
+    font-size: 18px;
+  }
+
+  .mobileNavMenu {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .addmusic-container {
+    margin: 1rem;
+    padding: 1rem;
+  }
+}
+
+
 @media (max-width: 800px), (max-height: 450px) {
   html, body {
     overflow: auto;
@@ -532,6 +882,7 @@ body{
     justify-content: flex-start;
     padding: 1rem;
     height: auto;
+    overflow-y: auto;
   }
 
   .music-Container {
@@ -575,9 +926,9 @@ body{
 }
 
 .delete-button {
-  background: 'none';
-  border: 'none';
-  color: 'red';
+  background: none;
+  border: none;
+  color: red;
   font-size: '1.2em';
   margin-left: '12px';
   cursor: 'pointer';

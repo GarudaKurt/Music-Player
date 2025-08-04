@@ -280,10 +280,10 @@ app.post('/manual-play', (req, res) => {
 
     if (action === 'play') {
       console.log('Manual play signal received. Turning amplifier ON.');
-      port.write("1\n");  // Turn ON Arduino amplifier
+      port.write("0\n");  // Turn ON Arduino amplifier
     } else if (action === 'pause' || action === 'stop') {
       console.log('Manual pause/stop signal received. Turning amplifier OFF.');
-      port.write("0\n");  // Turn OFF Arduino amplifier
+      port.write("1\n");  // Turn OFF Arduino amplifier
     } else {
       return res.status(400).json({ error: 'Invalid action' });
     }
