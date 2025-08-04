@@ -9,7 +9,7 @@ import axios from 'axios';
 
 const App = () => {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isHideShow, setIsHideShow] = useState(false);
@@ -71,7 +71,7 @@ const App = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth <= 1024);
       if (window.innerWidth >= 1024) setIsMenuOpen(false);
     };
     window.addEventListener('resize', handleResize);
