@@ -280,10 +280,10 @@ app.post('/manual-play', (req, res) => {
 
     if (action === 'play') {
       console.log('Manual play signal received. Turning amplifier ON.');
-      port.write("0\n");  // Turn ON Arduino amplifier
+      port.write("ON\n");  // Turn ON Arduino amplifier
     } else if (action === 'pause' || action === 'stop') {
       console.log('Manual pause/stop signal received. Turning amplifier OFF.');
-      port.write("1\n");  // Turn OFF Arduino amplifier
+      port.write("OFF\n");  // Turn OFF Arduino amplifier
     } else {
       return res.status(400).json({ error: 'Invalid action' });
     }
@@ -323,7 +323,7 @@ setInterval(() => {
 
       if (diffStart < 5000) {
         console.log(`Schedule "${schedule.scheduleName}" starts soon! Turning amplifier ON`);
-        port.write("0\n"); // Arduino receives  to turn ON
+        port.write("ON\n"); // Arduino receives  to turn ON
       }
 
       // OFF: when scheduled end hits
@@ -331,7 +331,7 @@ setInterval(() => {
 
       if (diffEnd < 5000) {
         console.log(`Schedule "${schedule.scheduleName}" ended. Turning amplifier OFF`);
-        port.write("1\n"); // Arduino receives 0 to turn OFF
+        port.write("OFF\n"); // Arduino receives 0 to turn OFF
       }
     });
   });
