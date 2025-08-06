@@ -72,7 +72,7 @@ const App = () => {
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 1024);
-      if (window.innerWidth >= 1024) setIsMenuOpen(false);
+      if (window.innerWidth >= 1025) setIsMenuOpen(false);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
