@@ -18,6 +18,16 @@ const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
 const app = express();
 const PORT = 5000;
 
+const crypto = require('crypto');
+
+let lastFileHash = null;
+let rebuildTimeout = null;
+
+function getFileHash(data) {
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+
 app.use(cors());
 app.use(express.json());
 
@@ -241,13 +251,32 @@ async function triggerOff(scheduleName, event) {
 
 
 if (fs.existsSync(scheduleFilePath)) {
-  fs.watchFile(scheduleFilePath, { interval: 1000 }, (curr, prev) => {
+  fs.watchFile(scheduleFilePath, { interval: 1000 }, async (curr, prev) => {
     if (curr.mtimeMs !== prev.mtimeMs) {
-      console.log('schedules.json changed on disk — rebuilding indexes');
-      rebuildScheduleIndex().catch(e => console.error('Rebuild error:', e));
+      // Debounce multiple events
+      if (rebuildTimeout) clearTimeout(rebuildTimeout);
+
+      rebuildTimeout = setTimeout(async () => {
+        try {
+          const raw = await fsPromises.readFile(scheduleFilePath, 'utf8');
+          const currentHash = getFileHash(raw);
+
+          if (currentHash !== lastFileHash) {
+            lastFileHash = currentHash;
+            console.log('schedules.json changed on disk — rebuilding indexes');
+            await rebuildScheduleIndex();
+          } else {
+            // File content same, ignore
+            // console.log('File changed but content identical, skipping rebuild');
+          }
+        } catch (err) {
+          console.error('Error during schedule file watcher:', err);
+        }
+      }, 500); // wait 500ms after last change before rebuild
     }
   });
 }
+
 
 app.get('/songs-list', async (req, res) => {
   try {
