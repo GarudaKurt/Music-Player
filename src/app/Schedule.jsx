@@ -216,8 +216,6 @@ const Schedule = () => {
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
           </select>
-
-
         </div>
 
         {showRepeatModal && (
