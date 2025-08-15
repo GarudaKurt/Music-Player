@@ -20,7 +20,7 @@ const App = () => {
   useEffect(() => {
     const checkIncomingSchedule = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/schedules');
+        const res = await axios.get('http://192.168.99.142:5000/schedules');
         const schedules = res.data;
         const now = new Date();
         const today = now.toISOString().split('T')[0];
