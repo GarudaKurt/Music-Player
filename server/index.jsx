@@ -236,8 +236,14 @@ app.get('/songs-list', (req, res) => {
 app.post('/manual-play', (req, res) => {
   const { action } = req.body;
   try {
-    if (action === 'play') port.write("ON\n");
-    else if (action === 'pause' || action === 'stop') port.write("OFF\n");
+    if (action === 'play') {
+      console.log("Manual Play ON")
+      port.write("ON\n");
+    }
+    else if (action === 'pause' || action === 'stop') {
+      console.log("Manual Play OFF")
+      port.write("OFF\n");
+    }
     else return res.status(400).json({ error: 'Invalid action' });
     res.status(200).json({ message: `Signal sent: ${action}` });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Error sending signal' }); }
