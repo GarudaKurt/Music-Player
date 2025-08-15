@@ -114,14 +114,20 @@ function triggerOn(scheduleName, event) {
   if (triggeredEvents.has(event.eventId)) return;
   triggeredEvents.set(event.eventId, Date.now());
   console.log(`Schedule "${scheduleName}" starts soon! Turning ON`);
-  try { port.write("ON\n"); } catch (err) { console.error(err); }
+  try {
+    console.log("Arduino ON")
+    port.write("ON\n");
+  } catch (err) { console.error(err); }
 }
 
 function triggerOff(scheduleName, event) {
   if (triggeredEvents.has(event.eventId)) return;
   triggeredEvents.set(event.eventId, Date.now());
   console.log(`Schedule "${scheduleName}" ended. Turning OFF`);
-  try { port.write("OFF\n"); } catch (err) { console.error(err); }
+  try {
+    console.log("Arduino OFF")
+    port.write("OFF\n");
+  } catch (err) { console.error(err); }
 }
 
 // -------------------- ROUTES --------------------
