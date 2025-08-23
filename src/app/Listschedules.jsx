@@ -9,6 +9,8 @@ const SchedulesMusic = () => {
   const [availableMusics, setAvailableMusics] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [selectedSongs, setSelectedSongs] = useState([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteScheduleId, setDeleteScheduleId] = useState(null);
 
   const getWeekRange = (offset) => {
     const today = new Date();
@@ -69,16 +71,36 @@ const SchedulesMusic = () => {
     }
   };
 
-  const handleDelete = async (scheduleId) => {
-    if (window.confirm('Are you sure you want to delete this schedule?')) {
-      try {
-        await axios.delete(`http://localhost:5000/schedules/${scheduleId}`);
-        fetchSchedules(); // Refresh list
-      } catch (err) {
-        console.error('Failed to delete schedule:', err);
+  // Open delete modal
+  const confirmDelete = (scheduleId) => {
+    setDeleteScheduleId(scheduleId);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Perform deletion
+  const handleDelete = async (mode, deleteAll = false) => {
+    try {
+      const id = deleteAll ? 'all' : deleteScheduleId;
+      let url = `http://localhost:5000/schedules/${id}?mode=${mode}`;
+
+      if (mode === 'selected' && selectedSongs.length > 0) {
+        const songParams = selectedSongs.map(s => encodeURIComponent(s.songSrc)).join(',');
+        url += `&songs=${songParams}`;
       }
+
+      await axios.delete(url);
+      fetchSchedules();
+    } catch (err) {
+      console.error("Failed to delete schedule:", err);
+      alert("Failed to delete schedule");
+    } finally {
+      setIsDeleteModalOpen(false);
+      setDeleteScheduleId(null);
+      setSelectedSongs([]);
     }
   };
+
+
 
   const fetchSchedules = async () => {
     try {
@@ -140,7 +162,7 @@ const SchedulesMusic = () => {
                   </button>
                   <button
                     className="delete-btn"
-                    onClick={() => handleDelete(schedule.id)}
+                    onClick={() => confirmDelete(schedule.id)}
                     title="Delete Schedule"
                   >
                     <i className="fa-solid fa-trash nav-icon"></i>
@@ -186,11 +208,60 @@ const SchedulesMusic = () => {
             </ul>
             <div className="modal-buttons">
               <button onClick={handleUpdateSchedule} className="addmusic-button">Save</button>
-              <button onClick={() => setIsEditModalOpen(false)} className="btn-cancel"> Cancel</button>
+              <button onClick={() => setIsEditModalOpen(false)} className="btn-cancel">Cancel</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="music-modal">
+          <div className="music-modal-content">
+            <h3 className='headerBlack'>🗑️ Delete Schedule</h3>
+            <p>Choose what you want to delete:</p>
+
+            <ul className="music-list">
+              {selectedSchedule?.playlist.map((song, index) => (
+                <li key={index} className="music-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedSongs.some(s => s.songSrc === song.songSrc)}
+                      onChange={() => toggleSongSelection(song)}
+                    />
+                    {song.songName} — <em>{song.songArtist}</em>
+                  </label>
+                </li>
+              ))}
+            </ul>
+
+            <div className="modal-buttons">
+              <button
+                onClick={() => handleDelete('all', true)}
+                className="btn-cancel"
+              >
+                🗑️ All Schedules
+              </button>
+              <button
+                onClick={() => handleDelete('selected')}
+                className="addmusic-button"
+              >
+                🗑️ Selected Songs
+              </button>
+
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="btn-cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 };

@@ -121,8 +121,23 @@ function triggerOff(scheduleName, event) {
   if (triggeredEvents.has(event.eventId)) return;
   triggeredEvents.set(event.eventId, Date.now());
   console.log(`Schedule "${scheduleName}" ended. Turning OFF`);
-  try { port.write("OFF\n"); } catch (err) { console.error(err); }
+
+  try {
+    port.write("OFF\n");
+    console.log("Schedule Arduino OFF")
+    // Remove occurrence once music finishes
+    schedulesDB.prepare(`DELETE FROM occurrences WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?`)
+      .run(event.scheduleId, event.date, event.startTime, event.endTime);
+
+    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}`);
+
+    // Rebuild indexes to keep scheduler accurate
+    buildIndexesFromDB();
+  } catch (err) {
+    console.error(err);
+  }
 }
+
 
 // -------------------- ROUTES --------------------
 
@@ -220,6 +235,83 @@ app.post('/uploads', upload.single('songFile'), (req, res) => {
     res.status(500).json({ error: 'Failed to save song' });
   }
 });
+
+// Delete a song by filename
+app.delete('/songs/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadPath, filename);
+
+    const song = musicDB.prepare(`SELECT * FROM songs WHERE songSrc = ?`).get(`/songs/${filename}`);
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found in DB' });
+    }
+
+    musicDB.prepare(`DELETE FROM songs WHERE id = ?`).run(song.id);
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    console.log(`Deleted song: ${filename}`);
+    res.status(200).json({ message: 'Song deleted successfully' });
+  } catch (err) {
+    console.error("Delete song error:", err);
+    res.status(500).json({ error: 'Failed to delete song' });
+  }
+});
+
+// Delete schedule OR just its playlist OR selected songs
+app.delete('/schedules/:id', (req, res) => {
+  try {
+    const { mode, songs } = req.query; // mode = 'playlist' | 'all' | 'selected'
+    const scheduleId = req.params.id;
+
+    if (mode === 'playlist') {
+      // Delete entire playlist for the schedule
+      schedulesDB.prepare(`DELETE FROM playlist WHERE scheduleId = ?`).run(scheduleId);
+      console.log("Deleted entire playlist for schedule", scheduleId);
+      buildIndexesFromDB();
+      return res.json({ message: `Playlist for schedule ${scheduleId} deleted` });
+    }
+    else if (mode === 'selected' && songs) {
+      // Delete only selected songs
+      const songList = Array.isArray(songs) ? songs : [songs];
+      const deleteSongStmt = schedulesDB.prepare(`
+        DELETE FROM playlist 
+        WHERE scheduleId = ? AND songSrc = ?
+      `);
+      songList.forEach(songSrc => deleteSongStmt.run(scheduleId, songSrc));
+
+      console.log(`Deleted selected songs from schedule ${scheduleId}:`, songList);
+      buildIndexesFromDB();
+      return res.json({ message: `Selected songs deleted from schedule ${scheduleId}` });
+    }
+    else if (mode === 'all' && scheduleId === 'all') {
+      // Delete all schedules + occurrences + playlists
+      schedulesDB.prepare(`DELETE FROM schedules`).run();
+      schedulesDB.prepare(`DELETE FROM occurrences`).run();
+      schedulesDB.prepare(`DELETE FROM playlist`).run();
+      console.log("Deleted all schedules and playlists");
+      buildIndexesFromDB();
+      return res.json({ message: `All schedules and their playlists deleted` });
+    }
+    else {
+      // Delete only the selected schedule + its occurrences + playlist
+      schedulesDB.prepare(`DELETE FROM schedules WHERE id = ?`).run(scheduleId);
+      schedulesDB.prepare(`DELETE FROM occurrences WHERE scheduleId = ?`).run(scheduleId);
+      schedulesDB.prepare(`DELETE FROM playlist WHERE scheduleId = ?`).run(scheduleId);
+      console.log("Deleted schedule completely", scheduleId);
+      buildIndexesFromDB();
+      return res.json({ message: `Schedule ${scheduleId} deleted completely` });
+    }
+  } catch (err) {
+    console.error("Delete schedule error:", err);
+    res.status(500).json({ error: 'Failed to delete schedule' });
+  }
+});
+
+
 
 // Get all songs
 app.get('/songs-list', (req, res) => {
