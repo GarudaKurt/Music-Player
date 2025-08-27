@@ -114,7 +114,12 @@ function triggerOn(scheduleName, event) {
   if (triggeredEvents.has(event.eventId)) return;
   triggeredEvents.set(event.eventId, Date.now());
   console.log(`Schedule "${scheduleName}" starts soon! Turning ON`);
-  try { port.write("ON\n"); } catch (err) { console.error(err); }
+  try {
+    console.log("Schedule Arduino ON")
+    port.write("ON\n");
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function triggerOff(scheduleName, event) {
@@ -261,34 +266,40 @@ app.delete('/songs/:filename', (req, res) => {
   }
 });
 
-// Delete schedule OR just its playlist OR selected songs
+// Delete schedule OR just its playlist OR selected songs OR occurrence
 app.delete('/schedules/:id', (req, res) => {
   try {
-    const { mode, songs } = req.query; // mode = 'playlist' | 'all' | 'selected'
+    const { mode, songs, date, startTime, endTime } = req.query;
     const scheduleId = req.params.id;
 
     if (mode === 'playlist') {
-      // Delete entire playlist for the schedule
       schedulesDB.prepare(`DELETE FROM playlist WHERE scheduleId = ?`).run(scheduleId);
       console.log("Deleted entire playlist for schedule", scheduleId);
       buildIndexesFromDB();
       return res.json({ message: `Playlist for schedule ${scheduleId} deleted` });
     }
     else if (mode === 'selected' && songs) {
-      // Delete only selected songs
       const songList = Array.isArray(songs) ? songs : [songs];
       const deleteSongStmt = schedulesDB.prepare(`
-        DELETE FROM playlist 
+        DELETE FROM playlist
         WHERE scheduleId = ? AND songSrc = ?
       `);
       songList.forEach(songSrc => deleteSongStmt.run(scheduleId, songSrc));
-
       console.log(`Deleted selected songs from schedule ${scheduleId}:`, songList);
       buildIndexesFromDB();
       return res.json({ message: `Selected songs deleted from schedule ${scheduleId}` });
     }
+    else if (mode === 'occurrence' && date && startTime && endTime) {
+      schedulesDB.prepare(`
+        DELETE FROM occurrences
+        WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?
+      `).run(scheduleId, date, startTime, endTime);
+
+      console.log(`Deleted single occurrence: scheduleId=${scheduleId}, date=${date}, ${startTime}-${endTime}`);
+      buildIndexesFromDB();
+      return res.json({ message: `Occurrence on ${date} deleted for schedule ${scheduleId}` });
+    }
     else if (mode === 'all' && scheduleId === 'all') {
-      // Delete all schedules + occurrences + playlists
       schedulesDB.prepare(`DELETE FROM schedules`).run();
       schedulesDB.prepare(`DELETE FROM occurrences`).run();
       schedulesDB.prepare(`DELETE FROM playlist`).run();
@@ -297,7 +308,6 @@ app.delete('/schedules/:id', (req, res) => {
       return res.json({ message: `All schedules and their playlists deleted` });
     }
     else {
-      // Delete only the selected schedule + its occurrences + playlist
       schedulesDB.prepare(`DELETE FROM schedules WHERE id = ?`).run(scheduleId);
       schedulesDB.prepare(`DELETE FROM occurrences WHERE scheduleId = ?`).run(scheduleId);
       schedulesDB.prepare(`DELETE FROM playlist WHERE scheduleId = ?`).run(scheduleId);
@@ -311,7 +321,50 @@ app.delete('/schedules/:id', (req, res) => {
   }
 });
 
+// Update schedule (playlist)
+app.put('/schedules/:id', (req, res) => {
+  try {
+    const scheduleId = req.params.id;
+    const { songs, scheduleName, startDate, endDate, startTime, endTime, repeatType, weekdays, monthDates } = req.body;
 
+    // Update basic schedule info if needed
+    schedulesDB.prepare(`
+      UPDATE schedules
+      SET scheduleName = ?, startDate = ?, endDate = ?, startTime = ?, endTime = ?, repeatType = ?, weekdays = ?
+      WHERE id = ?
+    `).run(
+      scheduleName,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      repeatType || null,
+      weekdays ? weekdays.join(',') : null,
+      scheduleId
+    );
+
+    // Delete old playlist
+    schedulesDB.prepare(`DELETE FROM playlist WHERE scheduleId = ?`).run(scheduleId);
+
+    // Insert new playlist
+    const insertSongStmt = schedulesDB.prepare(`
+      INSERT INTO playlist (scheduleId, songName, songArtist, songSrc, songAvatar)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    songs.forEach(song => {
+      insertSongStmt.run(scheduleId, song.songName, song.songArtist, song.songSrc, song.songAvatar || null);
+    });
+
+    // Optionally, rebuild scheduler indexes
+    buildIndexesFromDB();
+
+    res.json({ message: `Schedule ${scheduleId} updated successfully` });
+
+  } catch (err) {
+    console.error('Failed to update schedule:', err);
+    res.status(500).json({ error: 'Failed to update schedule' });
+  }
+});
 
 // Get all songs
 app.get('/songs-list', (req, res) => {

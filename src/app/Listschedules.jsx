@@ -8,6 +8,8 @@ const SchedulesMusic = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [availableMusics, setAvailableMusics] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [isOccurrenceModalOpen, setIsOccurrenceModalOpen] = useState(false);
+  const [selectedDates, setSelectedDates] = useState([]);
   const [selectedSongs, setSelectedSongs] = useState([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteScheduleId, setDeleteScheduleId] = useState(null);
@@ -30,10 +32,10 @@ const SchedulesMusic = () => {
 
   const handleEdit = async (schedule) => {
     try {
-      const res = await axios.get("http://localhost:5000/songs-list");
+      const res = await axios.get("http://192.168.99.142:5000/songs-list");
       setAvailableMusics(res.data);
       setSelectedSchedule(schedule);
-      setSelectedSongs(schedule.playlist); // prefill current songs
+      setSelectedSongs(schedule.playlist);
       setIsEditModalOpen(true);
     } catch (err) {
       console.error("Error loading songs:", err);
@@ -44,51 +46,79 @@ const SchedulesMusic = () => {
     if (!selectedSchedule) return;
 
     try {
-      const updatedSchedule = {
-        ...selectedSchedule,
-        songs: selectedSongs
-      };
-
-      await axios.put(`http://localhost:5000/schedules/${selectedSchedule.id}`, updatedSchedule, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-
+      const updatedSchedule = { ...selectedSchedule, songs: selectedSongs };
+      await axios.put(
+        `http://192.168.99.142:5000/schedules/${selectedSchedule.id}`,
+        updatedSchedule,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
       setIsEditModalOpen(false);
       setSelectedSchedule(null);
       setSelectedSongs([]);
-      fetchSchedules(); // refresh updated list
+      fetchSchedules();
     } catch (err) {
       console.error("Failed to update schedule:", err);
     }
   };
 
   const toggleSongSelection = (song) => {
-    const exists = selectedSongs.find((s) => s.songSrc === song.songSrc);
-    if (exists) {
-      setSelectedSongs((prev) => prev.filter((s) => s.songSrc !== song.songSrc));
-    } else {
-      setSelectedSongs((prev) => [...prev, song]);
-    }
+    setSelectedSongs((prev) =>
+      prev.some((s) => s.songSrc === song.songSrc)
+        ? prev.filter((s) => s.songSrc !== song.songSrc)
+        : [...prev, song]
+    );
   };
 
-  // Open delete modal
-  const confirmDelete = (scheduleId) => {
-    setDeleteScheduleId(scheduleId);
+  const confirmDelete = (schedule) => {
+    setDeleteScheduleId(schedule.id);
+    setSelectedSchedule(schedule);
+    setSelectedSongs([]);
     setIsDeleteModalOpen(true);
   };
 
-  // Perform deletion
+  const deleteSelectedDates = async () => {
+    if (!selectedSchedule) return;
+    try {
+      await Promise.all(
+        selectedDates.map((date) =>
+          axios.delete(
+            `http://192.168.99.142:5000/schedules/${selectedSchedule.id}?mode=occurrence&date=${date}&startTime=${selectedSchedule.startTime}&endTime=${selectedSchedule.endTime}`
+          )
+        )
+      );
+      alert(`✅ Selected dates deleted for schedule ${selectedSchedule.scheduleName}`);
+      fetchSchedules();
+    } catch (err) {
+      console.error("Failed to delete occurrences:", err);
+      alert("Failed to delete occurrences");
+    } finally {
+      setIsOccurrenceModalOpen(false);
+      setIsDeleteModalOpen(false);
+      setSelectedDates([]);
+    }
+  };
+
   const handleDelete = async (mode, deleteAll = false) => {
     try {
-      const id = deleteAll ? 'all' : deleteScheduleId;
-      let url = `http://localhost:5000/schedules/${id}?mode=${mode}`;
-
+      let url = `http://192.168.99.142:5000/schedules/${deleteAll ? 'all' : deleteScheduleId}?mode=${mode}`;
       if (mode === 'selected' && selectedSongs.length > 0) {
         const songParams = selectedSongs.map(s => encodeURIComponent(s.songSrc)).join(',');
         url += `&songs=${songParams}`;
       }
+      if (mode === 'occurrence' && selectedSchedule) {
+        url += `&date=${selectedSchedule.startDate}&startTime=${selectedSchedule.startTime}&endTime=${selectedSchedule.endTime}`;
+      }
 
       await axios.delete(url);
+
+      if (deleteAll) alert(`✅ All schedules deleted successfully.`);
+      else if (mode === 'occurrence')
+        alert(`✅ Schedule ID ${deleteScheduleId} deleted for date ${selectedSchedule.startDate}`);
+      else if (mode === 'selected') {
+        const songNames = selectedSongs.map(s => s.songName).join(', ');
+        alert(`✅ Selected songs deleted from Schedule ID ${deleteScheduleId}: ${songNames}`);
+      }
+
       fetchSchedules();
     } catch (err) {
       console.error("Failed to delete schedule:", err);
@@ -100,25 +130,18 @@ const SchedulesMusic = () => {
     }
   };
 
-
-
   const fetchSchedules = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/schedules');
+      const res = await axios.get('http://192.168.99.142:5000/schedules');
       const { monday, sunday } = getWeekRange(weekOffset);
-
       const filtered = res.data.filter(schedule => {
         const start = new Date(schedule.startDate);
         const end = new Date(schedule.endDate);
         return start <= sunday && end >= monday;
       });
-
       const sorted = filtered.sort((a, b) => {
-        const dateTimeA = new Date(`${a.startDate}T${a.startTime}`);
-        const dateTimeB = new Date(`${b.startDate}T${b.startTime}`);
-        return dateTimeA - dateTimeB;
+        return new Date(`${a.startDate}T${a.startTime}`) - new Date(`${b.startDate}T${b.startTime}`);
       });
-
       setScheduledPlaylist(sorted);
     } catch (err) {
       console.error('Failed to fetch schedules:', err);
@@ -153,18 +176,10 @@ const SchedulesMusic = () => {
               <div className="flex justify-between items-center">
                 <h3>{schedule.scheduleName}</h3>
                 <div className="flex gap-2">
-                  <button
-                    className="edit-btn"
-                    onClick={() => handleEdit(schedule)}
-                    title="Edit Schedule"
-                  >
+                  <button className="edit-btn" onClick={() => handleEdit(schedule)} title="Edit Schedule">
                     <i className="fa-solid fa-pencil nav-icon"></i>
                   </button>
-                  <button
-                    className="delete-btn"
-                    onClick={() => confirmDelete(schedule.id)}
-                    title="Delete Schedule"
-                  >
+                  <button className="delete-btn" onClick={() => confirmDelete(schedule)} title="Delete Schedule">
                     <i className="fa-solid fa-trash nav-icon"></i>
                   </button>
                 </div>
@@ -214,15 +229,15 @@ const SchedulesMusic = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
+      {/* Delete Modal */}
+      {isDeleteModalOpen && selectedSchedule && (
         <div className="music-modal">
           <div className="music-modal-content">
             <h3 className='headerBlack'>🗑️ Delete Schedule</h3>
             <p>Choose what you want to delete:</p>
 
             <ul className="music-list">
-              {selectedSchedule?.playlist.map((song, index) => (
+              {selectedSchedule.playlist.map((song, index) => (
                 <li key={index} className="music-item">
                   <label>
                     <input
@@ -236,32 +251,61 @@ const SchedulesMusic = () => {
               ))}
             </ul>
 
-            <div className="modal-buttons">
-              <button
-                onClick={() => handleDelete('all', true)}
-                className="btn-cancel"
-              >
-                🗑️ All Schedules
-              </button>
-              <button
-                onClick={() => handleDelete('selected')}
-                className="addmusic-button"
-              >
-                🗑️ Selected Songs
-              </button>
+            {isOccurrenceModalOpen && (
+              <div className="music-modal">
+                <div className="music-modal-content">
+                  <h3 className='headerBlack'>🗑️ Select Dates to Delete</h3>
+                  <ul className="music-list">
+                    {selectedSchedule.occurrences?.map((occ, index) => (
+                      <li key={index} className="music-item">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selectedDates.includes(occ.date)}
+                            onChange={() => {
+                              setSelectedDates(prev =>
+                                prev.includes(occ.date)
+                                  ? prev.filter(d => d !== occ.date)
+                                  : [...prev, occ.date]
+                              );
+                            }}
+                          />
+                          {occ.date} ({occ.startTime} - {occ.endTime})
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="modal-buttons">
+                    <button onClick={deleteSelectedDates} className="addmusic-button">
+                      Delete Selected Dates
+                    </button>
+                    <button onClick={() => setIsOccurrenceModalOpen(false)} className="btn-cancel">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="btn-cancel"
-              >
-                Cancel
-              </button>
-            </div>
+            {!isOccurrenceModalOpen && (
+              <div className="modal-buttons">
+                <button onClick={() => handleDelete('all', true)} className="addmusic-button">
+                  🗑️ All Schedules
+                </button>
+                <button onClick={() => { setSelectedDates([]); setIsOccurrenceModalOpen(true); }} className="btn-cancel">
+                  🗑️ Selected Date Only
+                </button>
+                <button onClick={() => handleDelete('selected')} className="btn-cancel">
+                  🗑️ Selected Schedules
+                </button>
+                <button onClick={() => setIsDeleteModalOpen(false)} className="btn-cancel">
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
-
-
     </div>
   );
 };

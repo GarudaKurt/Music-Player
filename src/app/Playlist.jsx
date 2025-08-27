@@ -51,7 +51,7 @@ const Playlist = () => {
     if (prev !== '/playlist' && now === '/playlist') {
       if (pausedScheduledDetails && !isOverrideMode) {
         setCurrentMusicDetails(pausedScheduledDetails);
-        currentAudio.current.src = `http://localhost:5000${pausedScheduledDetails.songSrc}`;
+        currentAudio.current.src = `http://192.168.99.142:5000${pausedScheduledDetails.songSrc}`;
         currentAudio.current.load();
         currentAudio.current.play().then(() => {
           setIsAudioPlaying(true);
@@ -128,7 +128,7 @@ const Playlist = () => {
   }, []);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/songs-list')
+    axios.get('http://192.168.99.142:5000/songs-list')
       .then(res => {
         setMusicAPI(res.data);
 
@@ -138,7 +138,7 @@ const Playlist = () => {
           setCurrentMusicDetails(firstSong);
           if (currentAudio.current) {
             currentAudio.current.oncanplay = null;
-            currentAudio.current.src = `http://localhost:5000${firstSong.songSrc}`;
+            currentAudio.current.src = `http://192.168.99.142:5000:${firstSong.songSrc}`;
             currentAudio.current.load();
           }
           setIsAudioPlaying(false);
@@ -146,7 +146,6 @@ const Playlist = () => {
       })
       .catch(err => console.error('Failed to fetch songs:', err));
   }, []);
-
 
 
   useEffect(() => {
@@ -166,6 +165,10 @@ const Playlist = () => {
         setIsAudioPlaying(false);
         setScheduledPlaylist([]);
         setScheduledSongIndex(0);
+        axios.post("http://192.168.99.142:5000/manual-play", { action: "stop" })
+          .then(() => console.log("Arduino OFF signal sent"))
+          .catch(err => console.error("Failed to send stop signal:", err));
+
         navigate("/")
         if (currentAudio.current) {
           currentAudio.current.pause();
@@ -181,20 +184,22 @@ const Playlist = () => {
   const playScheduledSong = (song, scheduleName = '') => {
     const audioEl = currentAudio.current;
     if (!audioEl || !song) return;
-
     setCurrentMusicDetails({
-      songName: song.songName,
-      songArtist: song.songArtist || scheduleName,
+      songName: scheduleName,
+      songArtist: song.songName,
       songSrc: song.songSrc,
       songAvatar: song.songAvatar || './Assets/Images/image.png'
     });
 
-    audioEl.src = `http://localhost:5000${song.songSrc}`;
+    audioEl.src = `http://192.168.99.142:5000${song.songSrc}`;
     audioEl.load();
 
     const tryPlay = () => {
       audioEl.play().then(() => {
         console.log(`▶️ Playing: ${song.songName}`);
+        axios.post("http://192.168.99.142:5000/manual-play", { action: "play" })
+          .then(() => console.log("Arduino ON signal sent"))
+          .catch(err => console.error("Failed to send play signal:", err));
         setIsAudioPlaying(true);
         lastPlayedTimestampRef.current = Date.now();
         clearTimeout(inactivityTimeoutRef.current);
@@ -223,7 +228,7 @@ const Playlist = () => {
     const checkAndPlayScheduledSong = async () => {
       if (isOverrideMode) return;
       try {
-        const schedulesRes = await axios.get('http://localhost:5000/schedules');
+        const schedulesRes = await axios.get('http://192.168.99.142:5000/schedules');
         const schedules = schedulesRes.data;
 
         const now = new Date();
@@ -281,7 +286,7 @@ const Playlist = () => {
     if (isOverrideMode) {
       if (pausedScheduledDetails) {
         setCurrentMusicDetails(pausedScheduledDetails);
-        currentAudio.current.src = `http://localhost:5000${pausedScheduledDetails.songSrc}`;
+        currentAudio.current.src = `http://192.168.99.142:5000:${pausedScheduledDetails.songSrc}`;
         currentAudio.current.load();
         currentAudio.current.play();
         setIsAudioPlaying(true);
@@ -301,7 +306,11 @@ const Playlist = () => {
 
   const handleSelectOverrideSong = (song) => {
     setCurrentMusicDetails(song);
-    currentAudio.current.src = `http://localhost:5000${song.songSrc}`;
+    axios.post("http://192.168.99.142:5000/manual-play", { action: "play" })
+      .then(() => console.log("Arduino ON (override)"))
+      .catch(err => console.error("Failed to send play signal:", err));
+
+    currentAudio.current.src = `http://192.168.99.142:5000:${song.songSrc}`;
     currentAudio.current.load();
     currentAudio.current.play();
     setIsAudioPlaying(true);
@@ -349,7 +358,7 @@ const Playlist = () => {
     setCurrentMusicDetails(music);
 
     if (currentAudio.current) {
-      currentAudio.current.src = `http://localhost:5000${music.songSrc}`;
+      currentAudio.current.src = `http://192.168.99.142:5000${music.songSrc}`;
       currentAudio.current.load();
       if (playNow) {
         currentAudio.current.play()
@@ -378,7 +387,7 @@ const Playlist = () => {
   const handleAudioPlay = async () => {
     if (currentAudio.current.paused) {
       try {
-        await axios.post('http://localhost:5000/manual-play', { action: 'play' });
+        await axios.post('http://192.168.99.142:5000/manual-play', { action: 'play' });
         console.log('Sent play signal to server');
       } catch (err) {
         console.error('Failed to send play signal:', err);
@@ -390,7 +399,7 @@ const Playlist = () => {
       clearTimeout(inactivityTimeoutRef.current);
     } else {
       try {
-        await axios.post('http://localhost:5000/manual-play', { action: 'pause' });
+        await axios.post('http://192.168.99.142:5000/manual-play', { action: 'pause' });
         console.log('Sent pause signal to server');
       } catch (err) {
         console.error('Failed to send pause signal:', err);
