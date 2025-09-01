@@ -1,4 +1,3 @@
-// App.jsx
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -15,47 +14,60 @@ const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isHideShow, setIsHideShow] = useState(false);
+  const [schedules, setSchedules] = useState([]);
+
 
   // ------------------ Check for upcoming schedules ------------------
+  // Fetch schedules in every 1 mins only to optimize query
   useEffect(() => {
-    const checkIncomingSchedule = async () => {
+    const fetchSchedules = async () => {
       try {
-        const res = await axios.get('http://192.168.99.142:5000/schedules');
-        const schedules = res.data;
-        const now = new Date();
-        const today = now.toISOString().split('T')[0];
-
-        for (const schedule of schedules) {
-          // Check occurrences first
-          const upcoming = schedule.occurrences?.some(occ => {
-            if (occ.date !== today) return false;
-
-            const [startH, startM] = occ.startTime.split(':').map(Number);
-            const [endH, endM] = occ.endTime.split(':').map(Number);
-
-            const startTime = new Date(now);
-            startTime.setHours(startH, startM, 0, 0);
-
-            const endTime = new Date(now);
-            endTime.setHours(endH, endM, 0, 0);
-
-            return now >= startTime && now <= endTime;
-          });
-
-          if (upcoming) {
-            if (location.pathname === '/') navigate('/playlist');
-            break;
-          }
-        }
+        const currentYear = new Date().getFullYear();
+        const res = await axios.get(
+          `http://192.168.99.142:5000/schedules?year=${currentYear}`
+        );
+        setSchedules(res.data);
       } catch (err) {
-        console.error('Error checking schedules:', err);
+        console.error('Error fetching schedules:', err);
       }
     };
 
-    checkIncomingSchedule();
-    const interval = setInterval(checkIncomingSchedule, 10000);
-    return () => clearInterval(interval);
-  }, [location.pathname, navigate]);
+    fetchSchedules();
+    const refresh = setInterval(fetchSchedules, 60000);
+    return () => clearInterval(refresh);
+  }, []);
+
+
+  // Re-check every second against currentTime
+  useEffect(() => {
+    if (!schedules.length) return;
+
+    const now = currentTime;
+    const today = now.toISOString().split('T')[0];
+
+    for (const schedule of schedules) {
+      const active = schedule.occurrences?.some(occ => {
+        if (occ.date !== today) return false;
+
+        const [startH, startM] = occ.startTime.split(':').map(Number);
+        const [endH, endM] = occ.endTime.split(':').map(Number);
+
+        const startTime = new Date(now);
+        startTime.setHours(startH, startM, 0, 0);
+
+        const endTime = new Date(now);
+        endTime.setHours(endH, endM, 0, 0);
+
+        return now >= startTime && now <= endTime;
+      });
+
+      if (active) {
+        if (location.pathname === '/') navigate('/playlist');
+        break;
+      }
+    }
+  }, [currentTime, schedules, location.pathname, navigate]);
+
 
   // ------------------ Current time updater ------------------
   useEffect(() => {
