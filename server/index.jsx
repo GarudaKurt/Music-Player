@@ -146,18 +146,49 @@ function triggerOff(scheduleName, event) {
 
 // -------------------- ROUTES --------------------
 
-// Fetch all schedules with their playlist
+// Fetch schedules with optional year filter
 app.get('/schedules', (req, res) => {
   try {
-    const schedules = schedulesDB.prepare(`SELECT * FROM schedules`).all();
-    const schedulesWithDetails = schedules.map(s => {
-      const occurrences = schedulesDB.prepare(`SELECT * FROM occurrences WHERE scheduleId = ?`).all(s.id);
-      const playlist = schedulesDB.prepare(`SELECT * FROM playlist WHERE scheduleId = ?`).all(s.id);
-      return { ...s, occurrences, playlist };
+    const year = req.query.year;
+
+    let schedulesQuery = `SELECT * FROM schedules`;
+    let occurrencesQuery = `SELECT * FROM occurrences`;
+    let schedulesParams = [];
+    let occurrencesParams = [];
+
+    if (year) {
+      schedulesQuery += ` WHERE strftime('%Y', startDate) = ? OR strftime('%Y', endDate) = ?`;
+      occurrencesQuery += ` WHERE strftime('%Y', date) = ?`;
+      schedulesParams = [year, year];
+      occurrencesParams = [year];
+    }
+
+    const schedules = schedulesDB.prepare(schedulesQuery).all(...schedulesParams);
+    const occurrences = schedulesDB.prepare(occurrencesQuery).all(...occurrencesParams);
+    const playlist = schedulesDB.prepare(`SELECT * FROM playlist`).all();
+
+    // Group + merge
+    const occurrencesMap = new Map();
+    occurrences.forEach(occ => {
+      if (!occurrencesMap.has(occ.scheduleId)) occurrencesMap.set(occ.scheduleId, []);
+      occurrencesMap.get(occ.scheduleId).push(occ);
     });
+
+    const playlistMap = new Map();
+    playlist.forEach(song => {
+      if (!playlistMap.has(song.scheduleId)) playlistMap.set(song.scheduleId, []);
+      playlistMap.get(song.scheduleId).push(song);
+    });
+
+    const schedulesWithDetails = schedules.map(s => ({
+      ...s,
+      occurrences: occurrencesMap.get(s.id) || [],
+      playlist: playlistMap.get(s.id) || []
+    }));
+
     res.json(schedulesWithDetails);
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching schedules:', err);
     res.status(500).json({ error: 'Failed to fetch schedules' });
   }
 });
