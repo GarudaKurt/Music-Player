@@ -153,7 +153,7 @@ app.post('/deactivate', (req, res) => {
       WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?
     `).run(event.scheduleId, event.date, event.startTime, event.endTime);
 
-    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}`);
+    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}, songs=${event.songName}`);
 
     // Rebuild indexes to keep scheduler accurate
     buildIndexesFromDB();
