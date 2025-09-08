@@ -32,7 +32,7 @@ const SchedulesMusic = () => {
 
   const handleEdit = async (schedule) => {
     try {
-      const res = await axios.get("http://192.168.99.142:5000/songs-list");
+      const res = await axios.get("http://localhost:5000/songs-list");
       setAvailableMusics(res.data);
       setSelectedSchedule(schedule);
       setSelectedSongs(schedule.playlist);
@@ -48,7 +48,7 @@ const SchedulesMusic = () => {
     try {
       const updatedSchedule = { ...selectedSchedule, songs: selectedSongs };
       await axios.put(
-        `http://192.168.99.142:5000/schedules/${selectedSchedule.id}`,
+        `http://localhost:5000/schedules/${selectedSchedule.id}`,
         updatedSchedule,
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -82,7 +82,7 @@ const SchedulesMusic = () => {
       await Promise.all(
         selectedDates.map((date) =>
           axios.delete(
-            `http://192.168.99.142:5000/schedules/${selectedSchedule.id}?mode=occurrence&date=${date}&startTime=${selectedSchedule.startTime}&endTime=${selectedSchedule.endTime}`
+            `http://localhost:5000/schedules/${selectedSchedule.id}?mode=occurrence&date=${date}&startTime=${selectedSchedule.startTime}&endTime=${selectedSchedule.endTime}`
           )
         )
       );
@@ -100,7 +100,7 @@ const SchedulesMusic = () => {
 
   const handleDelete = async (mode, deleteAll = false) => {
     try {
-      let url = `http://192.168.99.142:5000/schedules/${deleteAll ? 'all' : deleteScheduleId}?mode=${mode}`;
+      let url = `http://localhost:5000/schedules/${deleteAll ? 'all' : deleteScheduleId}?mode=${mode}`;
       if (mode === 'selected' && selectedSongs.length > 0) {
         const songParams = selectedSongs.map(s => encodeURIComponent(s.songSrc)).join(',');
         url += `&songs=${songParams}`;
@@ -132,7 +132,7 @@ const SchedulesMusic = () => {
 
   const fetchSchedules = async () => {
     try {
-      const res = await axios.get('http://192.168.99.142:5000/schedules');
+      const res = await axios.get('http://localhost:5000/schedules');
       const { monday, sunday } = getWeekRange(weekOffset);
       const filtered = res.data.filter(schedule => {
         const start = new Date(schedule.startDate);

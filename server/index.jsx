@@ -88,7 +88,6 @@ const upload = multer({ storage });
 let startIndex = new Map();
 let endIndex = new Map();
 const triggeredEvents = new Map();
-const TRIGGER_RETENTION_MS = 2 * 60 * 1000; // 2 minutes
 
 function unixSecond(date) {
   return Math.floor(date.getTime() / 1000);
@@ -103,64 +102,157 @@ function addToIndex(map, keySec, event) {
   map.get(keySec).push(event);
 }
 
-function cleanupTriggeredEvents() {
-  const now = Date.now();
-  for (const [eventId, ts] of triggeredEvents.entries()) {
-    if (now - ts > TRIGGER_RETENTION_MS) triggeredEvents.delete(eventId);
-  }
-}
+// -------------------- NEW API ROUTES --------------------
 
-function triggerOn(scheduleName, event) {
-  if (triggeredEvents.has(event.eventId)) return;
-  triggeredEvents.set(event.eventId, Date.now());
-  console.log(`Schedule "${scheduleName}" starts soon! Turning ON`);
+// Trigger ON manually
+app.post('/activate', (req, res) => {
   try {
-    console.log("Schedule Arduino ON")
+    const { scheduleName, event } = req.body;
+    if (!scheduleName || !event) {
+      return res.status(400).json({ error: 'Missing scheduleName or event' });
+    }
+
+    if (triggeredEvents.has(event.eventId)) {
+      return res.status(200).json({ message: 'Event already triggered ON recently' });
+    }
+
+    triggeredEvents.set(event.eventId, Date.now());
+    console.log(`Schedule "${scheduleName}" starts soon! Turning ON`);
+
     port.write("ON\n");
+    console.log("Schedule Arduino ON");
+
+    res.status(200).json({ message: `Trigger ON executed for ${scheduleName}` });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Failed to trigger ON' });
   }
-}
+});
 
-function triggerOff(scheduleName, event) {
-  if (triggeredEvents.has(event.eventId)) return;
-  triggeredEvents.set(event.eventId, Date.now());
-  console.log(`Schedule "${scheduleName}" ended. Turning OFF`);
-
+// Trigger OFF manually
+app.post('/deactivate', (req, res) => {
   try {
+    const { scheduleName, event } = req.body;
+    if (!scheduleName || !event) {
+      return res.status(400).json({ error: 'Missing scheduleName or event' });
+    }
+
+    if (triggeredEvents.has(event.eventId)) {
+      return res.status(200).json({ message: 'Event already triggered OFF recently' });
+    }
+
+    triggeredEvents.set(event.eventId, Date.now());
+    console.log(`Schedule "${scheduleName}" ended. Turning OFF`);
+
     port.write("OFF\n");
-    console.log("Schedule Arduino OFF")
-    // Remove occurrence once music finishes
-    schedulesDB.prepare(`DELETE FROM occurrences WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?`)
-      .run(event.scheduleId, event.date, event.startTime, event.endTime);
+    console.log("Schedule Arduino OFF");
+
+    // Retain delete query
+    schedulesDB.prepare(`
+      DELETE FROM occurrences 
+      WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?
+    `).run(event.scheduleId, event.date, event.startTime, event.endTime);
 
     console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}`);
 
     // Rebuild indexes to keep scheduler accurate
     buildIndexesFromDB();
+
+    res.status(200).json({ message: `Trigger OFF executed for ${scheduleName}` });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Failed to trigger OFF' });
   }
-}
+});
 
 
 // -------------------- ROUTES --------------------
 
 // Fetch all schedules with their playlist
+// Optimized /schedules route
+{/** OPTIMIZE THE CODE
 app.get('/schedules', (req, res) => {
   try {
+    // Fetch all at once
     const schedules = schedulesDB.prepare(`SELECT * FROM schedules`).all();
-    const schedulesWithDetails = schedules.map(s => {
-      const occurrences = schedulesDB.prepare(`SELECT * FROM occurrences WHERE scheduleId = ?`).all(s.id);
-      const playlist = schedulesDB.prepare(`SELECT * FROM playlist WHERE scheduleId = ?`).all(s.id);
-      return { ...s, occurrences, playlist };
+    const occurrences = schedulesDB.prepare(`SELECT * FROM occurrences`).all();
+    const playlist = schedulesDB.prepare(`SELECT * FROM playlist`).all();
+
+    // Group occurrences + playlist by scheduleId
+    const occurrencesMap = new Map();
+    occurrences.forEach(occ => {
+      if (!occurrencesMap.has(occ.scheduleId)) occurrencesMap.set(occ.scheduleId, []);
+      occurrencesMap.get(occ.scheduleId).push(occ);
     });
+
+    const playlistMap = new Map();
+    playlist.forEach(song => {
+      if (!playlistMap.has(song.scheduleId)) playlistMap.set(song.scheduleId, []);
+      playlistMap.get(song.scheduleId).push(song);
+    });
+
+    // Merge
+    const schedulesWithDetails = schedules.map(s => ({
+      ...s,
+      occurrences: occurrencesMap.get(s.id) || [],
+      playlist: playlistMap.get(s.id) || []
+    }));
+
     res.json(schedulesWithDetails);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch schedules' });
   }
 });
+*/}
+
+// Fetch schedules with optional year filter
+app.get('/schedules', (req, res) => {
+  try {
+    const year = req.query.year;
+
+    let schedulesQuery = `SELECT * FROM schedules`;
+    let occurrencesQuery = `SELECT * FROM occurrences`;
+    let schedulesParams = [];
+    let occurrencesParams = [];
+
+    if (year) {
+      schedulesQuery += ` WHERE strftime('%Y', startDate) = ? OR strftime('%Y', endDate) = ?`;
+      occurrencesQuery += ` WHERE strftime('%Y', date) = ?`;
+      schedulesParams = [year, year];
+      occurrencesParams = [year];
+    }
+
+    const schedules = schedulesDB.prepare(schedulesQuery).all(...schedulesParams);
+    const occurrences = schedulesDB.prepare(occurrencesQuery).all(...occurrencesParams);
+    const playlist = schedulesDB.prepare(`SELECT * FROM playlist`).all();
+
+    // Group + merge
+    const occurrencesMap = new Map();
+    occurrences.forEach(occ => {
+      if (!occurrencesMap.has(occ.scheduleId)) occurrencesMap.set(occ.scheduleId, []);
+      occurrencesMap.get(occ.scheduleId).push(occ);
+    });
+
+    const playlistMap = new Map();
+    playlist.forEach(song => {
+      if (!playlistMap.has(song.scheduleId)) playlistMap.set(song.scheduleId, []);
+      playlistMap.get(song.scheduleId).push(song);
+    });
+
+    const schedulesWithDetails = schedules.map(s => ({
+      ...s,
+      occurrences: occurrencesMap.get(s.id) || [],
+      playlist: playlistMap.get(s.id) || []
+    }));
+
+    res.json(schedulesWithDetails);
+  } catch (err) {
+    console.error('Error fetching schedules:', err);
+    res.status(500).json({ error: 'Failed to fetch schedules' });
+  }
+});
+
 
 // Add new schedule
 app.post('/schedules', (req, res) => {
@@ -168,6 +260,51 @@ app.post('/schedules', (req, res) => {
     const { scheduleName, startDate, endDate, startTime, endTime, songs, repeatType, weekdays, monthDates } = req.body;
     if (!scheduleName || !startDate || !endDate || !startTime || !endTime || !songs || songs.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // --- CONFLICT CHECK ---
+    const existingOccurrences = schedulesDB.prepare(`SELECT * FROM occurrences`).all();
+
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+    const weekdaysMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
+
+    while (current <= end) {
+      const dateStr = current.toISOString().slice(0, 10);
+      const dayOfWeek = current.getDay();
+      const dayOfMonth = current.getDate();
+
+      let shouldInsert = false;
+      if (repeatType === "weekly") {
+        shouldInsert = weekdays.some(d => weekdaysMap[d] === dayOfWeek);
+      } else if (repeatType === "monthly") {
+        shouldInsert = monthDates.includes(dayOfMonth);
+      } else {
+        shouldInsert = true; // no-repeat
+      }
+
+      if (shouldInsert) {
+        const conflicts = existingOccurrences.filter(occ => {
+          if (occ.date !== dateStr) return false;
+
+          const newStart = new Date(`${dateStr}T${startTime}`);
+          const newEnd = new Date(`${dateStr}T${endTime}`);
+          const occStart = new Date(`${occ.date}T${occ.startTime}`);
+          const occEnd = new Date(`${occ.date}T${occ.endTime}`);
+
+          if (newStart.getTime() === occStart.getTime()) {
+            return true;
+          }
+
+          return (newStart < occEnd && newEnd > occStart);
+        });
+
+        if (conflicts.length > 0) {
+          return res.status(409).json({ error: 'Conflict schedule detected' });
+        }
+      }
+
+      current.setDate(current.getDate() + 1);
     }
 
     const result = schedulesDB.prepare(`
@@ -182,27 +319,24 @@ app.post('/schedules', (req, res) => {
       VALUES (?, ?, ?, ?)
     `);
 
-    let current = new Date(startDate);
-    const end = new Date(endDate);
-    const weekdaysMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
-
+    current = new Date(startDate);
     while (current <= end) {
-      const dayOfWeek = current.getDay(); // 0=Sun ... 6=Sat
-      const dayOfMonth = current.getDate(); // 1-31
+      const dateStr = current.toISOString().slice(0, 10);
+      const dayOfWeek = current.getDay();
+      const dayOfMonth = current.getDate();
 
+      let shouldInsert = false;
       if (repeatType === "weekly") {
-        if (weekdays.some(d => weekdaysMap[d] === dayOfWeek)) {
-          insertOcc.run(scheduleId, current.toISOString().slice(0, 10), startTime, endTime);
-        }
+        shouldInsert = weekdays.some(d => weekdaysMap[d] === dayOfWeek);
       } else if (repeatType === "monthly") {
-        if (monthDates.includes(dayOfMonth)) {
-          insertOcc.run(scheduleId, current.toISOString().slice(0, 10), startTime, endTime);
-        }
+        shouldInsert = monthDates.includes(dayOfMonth);
       } else {
-        // no-repeat
-        insertOcc.run(scheduleId, current.toISOString().slice(0, 10), startTime, endTime);
+        shouldInsert = true;
       }
 
+      if (shouldInsert) {
+        insertOcc.run(scheduleId, dateStr, startTime, endTime);
+      }
       current.setDate(current.getDate() + 1);
     }
 
@@ -219,6 +353,7 @@ app.post('/schedules', (req, res) => {
     res.status(500).json({ error: 'Failed to save schedule' });
   }
 });
+
 
 // Upload song
 app.post('/uploads', upload.single('songFile'), (req, res) => {
@@ -424,26 +559,6 @@ function buildIndexesFromDB() {
   console.log(`Indexes rebuilt: startIndex keys=${startIndex.size}, endIndex keys=${endIndex.size}`);
 }
 
-// Scheduler loop
-(function initScheduler() {
-  buildIndexesFromDB();
-
-  setInterval(() => {
-    try {
-      const nowSec = Math.floor(Date.now() / 1000);
-      cleanupTriggeredEvents();
-
-      for (let offset = -1; offset <= 1; offset++) {
-        const onEvents = startIndex.get(nowSec + offset);
-        if (Array.isArray(onEvents)) onEvents.forEach(e => triggerOn(e.scheduleName, e));
-
-        const offEvents = endIndex.get(nowSec + offset);
-        if (Array.isArray(offEvents)) offEvents.forEach(e => triggerOff(e.scheduleName, e));
-      }
-
-    } catch (err) { console.error('Scheduler loop error:', err); }
-  }, 1000);
-})();
 
 // -------------------- START SERVER --------------------
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
