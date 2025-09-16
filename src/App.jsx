@@ -1,4 +1,3 @@
-// App.jsx
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -17,9 +16,8 @@ const App = () => {
   const [isHideShow, setIsHideShow] = useState(false);
   const [schedules, setSchedules] = useState([]);
 
-
   // ------------------ Check for upcoming schedules ------------------
-  // Fetch schedules once
+  // Fetch schedules in every 1 mins
   useEffect(() => {
     const fetchSchedules = async () => {
       try {
@@ -27,9 +25,13 @@ const App = () => {
         const res = await axios.get(
           `http://localhost:5000/schedules?year=${currentYear}`
         );
+
         setSchedules(res.data);
+
+        // 🔍 Debug log full API response
+        console.log("🔍 API Schedules Response:", JSON.stringify(res.data, null, 2));
       } catch (err) {
-        console.error('Error fetching schedules:', err);
+        console.error("❌ Error fetching schedules:", err);
       }
     };
 
@@ -38,19 +40,28 @@ const App = () => {
     return () => clearInterval(refresh);
   }, []);
 
-  // Re-check every second against currentTime
+  // ------------------ Activate when inside schedule ------------------
   useEffect(() => {
     if (!schedules.length) return;
 
     const now = currentTime;
-    const today = now.toISOString().split('T')[0];
+    const today = now.toLocaleDateString("en-CA");
+
+    console.log(" Current local date:", today);
 
     for (const schedule of schedules) {
-      const activeOccurrence = schedule.occurrences?.find(occ => {
+      console.log("Checking schedule:", schedule.scheduleName);
+
+      const activeOccurrence = schedule.occurrences?.find((occ) => {
+        // Debug each occurrence date
+        console.log(
+          `  Occurrence date=${occ.date}, start=${occ.startTime}, end=${occ.endTime}`
+        );
+
         if (occ.date !== today) return false;
 
-        const [startH, startM] = occ.startTime.split(':').map(Number);
-        const [endH, endM] = occ.endTime.split(':').map(Number);
+        const [startH, startM] = occ.startTime.split(":").map(Number);
+        const [endH, endM] = occ.endTime.split(":").map(Number);
 
         const startTime = new Date(now);
         startTime.setHours(startH, startM, 0, 0);
@@ -58,28 +69,32 @@ const App = () => {
         const endTime = new Date(now);
         endTime.setHours(endH, endM, 0, 0);
 
+        console.log("    Now:", now);
+        console.log("    Start:", startTime);
+        console.log("    End:", endTime);
+
         return now >= startTime && now <= endTime;
       });
 
       if (activeOccurrence) {
-        console.log("Schedule arduino on")
-        axios.post("http://localhost:5000/activate", {
-          scheduleName: schedule.scheduleName,
-          event: {
-            eventId: `${schedule.id}::start::${activeOccurrence.date}::${activeOccurrence.startTime}`,
-            ...activeOccurrence,
-            scheduleId: schedule.id
-          }
-        }).catch(err => console.error("Activate failed:", err));
+        console.log("✅ Active occurrence found → Arduino ON:", activeOccurrence);
 
-        // Navigate to playlist
+        axios
+          .post("http://localhost:5000/activate", {
+            scheduleName: schedule.scheduleName,
+            event: {
+              eventId: `${schedule.id}::start::${activeOccurrence.date}::${activeOccurrence.startTime}`,
+              ...activeOccurrence,
+              scheduleId: schedule.id,
+            },
+          })
+          .catch((err) => console.error("❌ Activate failed:", err));
+
         if (location.pathname === "/") navigate("/playlist");
         break;
       }
     }
   }, [currentTime, schedules, location.pathname, navigate]);
-
-
 
   // ------------------ Current time updater ------------------
   useEffect(() => {
@@ -89,7 +104,12 @@ const App = () => {
 
   // ------------------ Hide/show logic ------------------
   useEffect(() => {
-    const hiddenRoutes = ['/playlist', '/schedule', '/addmusic', '/schedulesmusic'];
+    const hiddenRoutes = [
+      '/playlist',
+      '/schedule',
+      '/addmusic',
+      '/schedulesmusic',
+    ];
     setIsHideShow(hiddenRoutes.includes(location.pathname));
   }, [location.pathname]);
 
@@ -114,7 +134,8 @@ const App = () => {
       <div className="overlay-content">
         {!isHideShow && (
           <div className="date-time-center">
-            {currentTime.toLocaleDateString()}<br />
+            {currentTime.toLocaleDateString()}
+            <br />
             {currentTime.toLocaleTimeString()}
           </div>
         )}
@@ -129,16 +150,34 @@ const App = () => {
 
         {isMobile ? (
           <>
-            <button className="hamburger" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <button
+              className="hamburger"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
               <i className="fa fa-bars"></i>
             </button>
             {isMenuOpen && (
               <div className="mobileNavMenu">
-                <i className="fa-solid fa-house nav-icon" onClick={() => handleNavigate('/')} />
-                <i className="fa-solid fa-play nav-icon" onClick={() => handleNavigate('/playlist')} />
-                <i className="fa-solid fa-music nav-icon" onClick={() => handleNavigate('/addmusic')} />
-                <i className="fa-solid fa-tags nav-icon" onClick={() => handleNavigate('/schedule')} />
-                <i className="fa-solid fa-calendar-days nav-icon" onClick={() => handleNavigate('/schedulesmusic')} />
+                <i
+                  className="fa-solid fa-house nav-icon"
+                  onClick={() => handleNavigate('/')}
+                />
+                <i
+                  className="fa-solid fa-play nav-icon"
+                  onClick={() => handleNavigate('/playlist')}
+                />
+                <i
+                  className="fa-solid fa-music nav-icon"
+                  onClick={() => handleNavigate('/addmusic')}
+                />
+                <i
+                  className="fa-solid fa-tags nav-icon"
+                  onClick={() => handleNavigate('/schedule')}
+                />
+                <i
+                  className="fa-solid fa-calendar-days nav-icon"
+                  onClick={() => handleNavigate('/schedulesmusic')}
+                />
               </div>
             )}
           </>
@@ -160,7 +199,10 @@ const App = () => {
               <i className="fa-solid fa-tags nav-icon"></i>
               <span className="nav-label">Set Schedule</span>
             </div>
-            <div className="nav-item" onClick={() => navigate('/schedulesmusic')}>
+            <div
+              className="nav-item"
+              onClick={() => navigate('/schedulesmusic')}
+            >
               <i className="fa-solid fa-calendar-days nav-icon"></i>
               <span className="nav-label">Music Sched</span>
             </div>

@@ -102,6 +102,15 @@ function addToIndex(map, keySec, event) {
   map.get(keySec).push(event);
 }
 
+// -------------------- HELPERS --------------------
+function formatDateLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`; // YYYY-MM-DD in local (Philippine) time
+}
+
+
 // -------------------- NEW API ROUTES --------------------
 
 // Trigger ON manually
@@ -153,7 +162,7 @@ app.post('/deactivate', (req, res) => {
       WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?
     `).run(event.scheduleId, event.date, event.startTime, event.endTime);
 
-    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}, songs=${event.songName}`);
+    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}`);
 
     // Rebuild indexes to keep scheduler accurate
     buildIndexesFromDB();
@@ -270,7 +279,7 @@ app.post('/schedules', (req, res) => {
     const weekdaysMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
 
     while (current <= end) {
-      const dateStr = current.toISOString().slice(0, 10);
+      const dateStr = formatDateLocal(current);
       const dayOfWeek = current.getDay();
       const dayOfMonth = current.getDate();
 
@@ -291,7 +300,6 @@ app.post('/schedules', (req, res) => {
           const newEnd = new Date(`${dateStr}T${endTime}`);
           const occStart = new Date(`${occ.date}T${occ.startTime}`);
           const occEnd = new Date(`${occ.date}T${occ.endTime}`);
-
           if (newStart.getTime() === occStart.getTime()) {
             return true;
           }
@@ -321,7 +329,7 @@ app.post('/schedules', (req, res) => {
 
     current = new Date(startDate);
     while (current <= end) {
-      const dateStr = current.toISOString().slice(0, 10);
+      const dateStr = formatDateLocal(current);
       const dayOfWeek = current.getDay();
       const dayOfMonth = current.getDate();
 
