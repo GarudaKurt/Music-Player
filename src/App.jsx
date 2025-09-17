@@ -1,11 +1,24 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useQuery } from '@tanstack/react-query';
 
 import Addmusic from './app/Addmusic';
 import Playlist from './app/Playlist';
 import Schedule from './app/Schedule';
 import SchedulesMusic from './app/Listschedules';
+
+// ------------------ FETCH SCHEDULES ------------------
+const fetchTodaySchedules = async () => {
+  // Get today's date in PH timezone
+  const nowPH = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
+  );
+  const todayPH = nowPH.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const res = await axios.get(`http://localhost:5000/schedules?date=${todayPH}`);
+  return res.data;
+};
 
 const App = () => {
   const navigate = useNavigate();
@@ -14,95 +27,74 @@ const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isHideShow, setIsHideShow] = useState(false);
-  const [schedules, setSchedules] = useState([]);
+  const [activeEventId, setActiveEventId] = useState(null);
 
-  // ------------------ Check for upcoming schedules ------------------
-  // Fetch schedules in every 1 mins
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        const currentYear = new Date().getFullYear();
-        const res = await axios.get(
-          `http://localhost:5000/schedules?year=${currentYear}`
-        );
+  // ------------------ FETCH TODAY'S SCHEDULES ------------------
+  const {
+    data: schedules = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['todaySchedules'],
+    queryFn: fetchTodaySchedules,
+    refetchInterval: 60000, // auto-refetch every 1 min
+  });
 
-        setSchedules(res.data);
-
-        // 🔍 Debug log full API response
-        console.log("🔍 API Schedules Response:", JSON.stringify(res.data, null, 2));
-      } catch (err) {
-        console.error("❌ Error fetching schedules:", err);
-      }
-    };
-
-    fetchSchedules();
-    const refresh = setInterval(fetchSchedules, 60000);
-    return () => clearInterval(refresh);
-  }, []);
-
-  // ------------------ Activate when inside schedule ------------------
+  // ------------------ ACTIVATE CURRENT SCHEDULE ------------------
   useEffect(() => {
     if (!schedules.length) return;
 
-    const now = currentTime;
-    const today = now.toLocaleDateString("en-CA");
-
-    console.log(" Current local date:", today);
+    const nowPH = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
+    );
 
     for (const schedule of schedules) {
-      console.log("Checking schedule:", schedule.scheduleName);
-
       const activeOccurrence = schedule.occurrences?.find((occ) => {
-        // Debug each occurrence date
-        console.log(
-          `  Occurrence date=${occ.date}, start=${occ.startTime}, end=${occ.endTime}`
-        );
+        const [startH, startM] = occ.startTime.split(':').map(Number);
+        const [endH, endM] = occ.endTime.split(':').map(Number);
 
-        if (occ.date !== today) return false;
-
-        const [startH, startM] = occ.startTime.split(":").map(Number);
-        const [endH, endM] = occ.endTime.split(":").map(Number);
-
-        const startTime = new Date(now);
+        const startTime = new Date(nowPH);
         startTime.setHours(startH, startM, 0, 0);
 
-        const endTime = new Date(now);
+        const endTime = new Date(nowPH);
         endTime.setHours(endH, endM, 0, 0);
-
-        console.log("    Now:", now);
-        console.log("    Start:", startTime);
-        console.log("    End:", endTime);
-
-        return now >= startTime && now <= endTime;
+        return nowPH >= startTime && nowPH <= endTime;
       });
 
       if (activeOccurrence) {
-        console.log("✅ Active occurrence found → Arduino ON:", activeOccurrence);
+        const newEventId = `${schedule.id}::start::${activeOccurrence.date}::${activeOccurrence.startTime}`;
 
-        axios
-          .post("http://localhost:5000/activate", {
-            scheduleName: schedule.scheduleName,
-            event: {
-              eventId: `${schedule.id}::start::${activeOccurrence.date}::${activeOccurrence.startTime}`,
-              ...activeOccurrence,
-              scheduleId: schedule.id,
-            },
-          })
-          .catch((err) => console.error("❌ Activate failed:", err));
+        if (activeEventId !== newEventId) {
+          setActiveEventId(newEventId);
 
-        if (location.pathname === "/") navigate("/playlist");
+          axios
+            .post('http://localhost:5000/activate', {
+              scheduleName: schedule.scheduleName,
+              event: {
+                eventId: newEventId,
+                ...activeOccurrence,
+                scheduleId: schedule.id,
+              },
+            })
+            .then(() =>
+              console.log(`[DEBUG] Activated scheduleId=${schedule.id}`)
+            )
+            .catch((err) => console.error('❌ Activate failed:', err));
+
+          if (location.pathname === '/') navigate('/playlist');
+        }
         break;
       }
     }
-  }, [currentTime, schedules, location.pathname, navigate]);
+  }, [currentTime, schedules, location.pathname, navigate, activeEventId]);
 
-  // ------------------ Current time updater ------------------
+  // ------------------ CURRENT TIME UPDATER ------------------
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // ------------------ Hide/show logic ------------------
+  // ------------------ HIDE/SHOW LOGIC ------------------
   useEffect(() => {
     const hiddenRoutes = [
       '/playlist',
@@ -113,7 +105,7 @@ const App = () => {
     setIsHideShow(hiddenRoutes.includes(location.pathname));
   }, [location.pathname]);
 
-  // ------------------ Mobile resize ------------------
+  // ------------------ MOBILE RESIZE ------------------
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 1024);
@@ -140,6 +132,9 @@ const App = () => {
           </div>
         )}
 
+        {isLoading && <p>Loading schedules...</p>}
+        {error && <p>Failed to load schedules</p>}
+
         <Routes>
           <Route path="/playlist" element={<Playlist />} />
           <Route path="/addmusic" element={<Addmusic />} />
@@ -158,26 +153,11 @@ const App = () => {
             </button>
             {isMenuOpen && (
               <div className="mobileNavMenu">
-                <i
-                  className="fa-solid fa-house nav-icon"
-                  onClick={() => handleNavigate('/')}
-                />
-                <i
-                  className="fa-solid fa-play nav-icon"
-                  onClick={() => handleNavigate('/playlist')}
-                />
-                <i
-                  className="fa-solid fa-music nav-icon"
-                  onClick={() => handleNavigate('/addmusic')}
-                />
-                <i
-                  className="fa-solid fa-tags nav-icon"
-                  onClick={() => handleNavigate('/schedule')}
-                />
-                <i
-                  className="fa-solid fa-calendar-days nav-icon"
-                  onClick={() => handleNavigate('/schedulesmusic')}
-                />
+                <i className="fa-solid fa-house nav-icon" onClick={() => handleNavigate('/')} />
+                <i className="fa-solid fa-play nav-icon" onClick={() => handleNavigate('/playlist')} />
+                <i className="fa-solid fa-music nav-icon" onClick={() => handleNavigate('/addmusic')} />
+                <i className="fa-solid fa-tags nav-icon" onClick={() => handleNavigate('/schedule')} />
+                <i className="fa-solid fa-calendar-days nav-icon" onClick={() => handleNavigate('/schedulesmusic')} />
               </div>
             )}
           </>
@@ -199,10 +179,7 @@ const App = () => {
               <i className="fa-solid fa-tags nav-icon"></i>
               <span className="nav-label">Set Schedule</span>
             </div>
-            <div
-              className="nav-item"
-              onClick={() => navigate('/schedulesmusic')}
-            >
+            <div className="nav-item" onClick={() => navigate('/schedulesmusic')}>
               <i className="fa-solid fa-calendar-days nav-icon"></i>
               <span className="nav-label">Music Sched</span>
             </div>

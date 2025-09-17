@@ -94,8 +94,10 @@ function unixSecond(date) {
 }
 
 function parseTimeToDate(dateStr, timeStr) {
-  return new Date(`${dateStr}T${timeStr.padStart(5, '0')}:00`);
+  const dt = new Date(`${dateStr}T${timeStr.padStart(5, '0')}:00`);
+  return dt;
 }
+
 
 function addToIndex(map, keySec, event) {
   if (!map.has(keySec)) map.set(keySec, []);
@@ -107,8 +109,10 @@ function formatDateLocal(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`; // YYYY-MM-DD in local (Philippine) time
+  const formatted = `${y}-${m}-${d}`;
+  return formatted; // YYYY-MM-DD in local (Philippine) time
 }
+
 
 
 // -------------------- NEW API ROUTES --------------------
@@ -215,17 +219,22 @@ app.get('/schedules', (req, res) => {
 });
 */}
 
-// Fetch schedules with optional year filter
+// Fetch schedules with optional date or year filter
 app.get('/schedules', (req, res) => {
   try {
-    const year = req.query.year;
+    const { year, date } = req.query;
 
     let schedulesQuery = `SELECT * FROM schedules`;
     let occurrencesQuery = `SELECT * FROM occurrences`;
     let schedulesParams = [];
     let occurrencesParams = [];
 
-    if (year) {
+    if (date) {
+      // Filter occurrences for today
+      occurrencesQuery += ` WHERE date = ?`;
+      occurrencesParams = [date];
+    } else if (year) {
+      // Existing year filter
       schedulesQuery += ` WHERE strftime('%Y', startDate) = ? OR strftime('%Y', endDate) = ?`;
       occurrencesQuery += ` WHERE strftime('%Y', date) = ?`;
       schedulesParams = [year, year];
@@ -236,7 +245,7 @@ app.get('/schedules', (req, res) => {
     const occurrences = schedulesDB.prepare(occurrencesQuery).all(...occurrencesParams);
     const playlist = schedulesDB.prepare(`SELECT * FROM playlist`).all();
 
-    // Group + merge
+    // Group occurrences + playlist by scheduleId
     const occurrencesMap = new Map();
     occurrences.forEach(occ => {
       if (!occurrencesMap.has(occ.scheduleId)) occurrencesMap.set(occ.scheduleId, []);
@@ -249,6 +258,7 @@ app.get('/schedules', (req, res) => {
       playlistMap.get(song.scheduleId).push(song);
     });
 
+    // Merge
     const schedulesWithDetails = schedules.map(s => ({
       ...s,
       occurrences: occurrencesMap.get(s.id) || [],
@@ -256,11 +266,13 @@ app.get('/schedules', (req, res) => {
     }));
 
     res.json(schedulesWithDetails);
+
   } catch (err) {
     console.error('Error fetching schedules:', err);
     res.status(500).json({ error: 'Failed to fetch schedules' });
   }
 });
+
 
 
 // Add new schedule

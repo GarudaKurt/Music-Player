@@ -137,9 +137,14 @@ const Playlist = () => {
         if (res.data.length > 0 && !isScheduledPlaying.current) {
           const firstSong = res.data[0];
           setCurrentMusicDetails(firstSong);
+
           if (currentAudio.current) {
             currentAudio.current.oncanplay = null;
-            currentAudio.current.src = `http://localhost:5000:${firstSong.songSrc}`;
+
+            // Ensure songSrc starts with /
+            const srcPath = firstSong.songSrc.startsWith('/') ? firstSong.songSrc : '/' + firstSong.songSrc;
+            currentAudio.current.src = `http://localhost:5000${srcPath}`;
+
             currentAudio.current.load();
           }
           setIsAudioPlaying(false);
@@ -147,6 +152,7 @@ const Playlist = () => {
       })
       .catch(err => console.error('Failed to fetch songs:', err));
   }, []);
+
 
 
   useEffect(() => {
@@ -178,6 +184,11 @@ const Playlist = () => {
             }
           }).catch(err => console.error("Failed to trigger OFF:", err));
           navigate('/')
+          if (currentAudio.current) {
+            currentAudio.current.pause();
+            currentAudio.current.currentTime = 0;
+            currentAudio.current.src = "";
+          }
 
         }
 
@@ -294,12 +305,19 @@ const Playlist = () => {
     if (isOverrideMode) {
       if (pausedScheduledDetails) {
         setCurrentMusicDetails(pausedScheduledDetails);
-        currentAudio.current.src = `http://localhost:5000:${pausedScheduledDetails.songSrc}`;
+
+        // Fix: ensure proper URL without colon
+        const srcPath = pausedScheduledDetails.songSrc.startsWith('/')
+          ? pausedScheduledDetails.songSrc
+          : '/' + pausedScheduledDetails.songSrc;
+
+        currentAudio.current.src = `http://localhost:5000${srcPath}`;
         currentAudio.current.load();
-        currentAudio.current.play();
-        setIsAudioPlaying(true);
-        lastPlayedTimestampRef.current = Date.now();
-        clearTimeout(inactivityTimeoutRef.current);
+        currentAudio.current.play().then(() => {
+          setIsAudioPlaying(true);
+          lastPlayedTimestampRef.current = Date.now();
+          clearTimeout(inactivityTimeoutRef.current);
+        }).catch(err => console.warn('Autoplay resume failed:', err.message));
       }
       setIsOverrideMode(false);
       setPausedScheduledDetails(null);
@@ -312,21 +330,27 @@ const Playlist = () => {
     }
   };
 
+
   const handleSelectOverrideSong = (song) => {
     setCurrentMusicDetails(song);
     axios.post("http://localhost:5000/manual-play", { action: "play" })
       .then(() => console.log("Arduino ON (override)"))
       .catch(err => console.error("Failed to send play signal:", err));
 
-    currentAudio.current.src = `http://localhost:5000:${song.songSrc}`;
+    // Fix URL
+    const srcPath = song.songSrc.startsWith('/') ? song.songSrc : '/' + song.songSrc;
+    currentAudio.current.src = `http://localhost:5000${srcPath}`;
     currentAudio.current.load();
-    currentAudio.current.play();
-    setIsAudioPlaying(true);
-    lastPlayedTimestampRef.current = Date.now();
-    clearTimeout(inactivityTimeoutRef.current);
+    currentAudio.current.play().then(() => {
+      setIsAudioPlaying(true);
+      lastPlayedTimestampRef.current = Date.now();
+      clearTimeout(inactivityTimeoutRef.current);
+    }).catch(err => console.warn('Autoplay failed:', err.message));
+
     setIsOverrideMode(true);
     setIsModalOpen(false);
   };
+
 
 
   const handleNextSong = () => {
