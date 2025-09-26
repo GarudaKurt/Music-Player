@@ -10,13 +10,9 @@ import SchedulesMusic from './app/Listschedules';
 
 // ------------------ FETCH SCHEDULES ------------------
 const fetchTodaySchedules = async () => {
-  // Get today's date in PH timezone
-  const nowPH = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
-  );
-  const todayPH = nowPH.toISOString().split('T')[0]; // YYYY-MM-DD
-
-  const res = await axios.get(`http://localhost:5000/schedules?date=${todayPH}`);
+  // Use local PC date instead of PH timezone
+  const todayLocal = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const res = await axios.get(`http://localhost:5000/schedules?date=${todayLocal}`);
   return res.data;
 };
 
@@ -40,25 +36,27 @@ const App = () => {
     refetchInterval: 60000, // auto-refetch every 1 min
   });
 
+  // Reset activeEventId whenever schedules change
+  useEffect(() => {
+    setActiveEventId(null);
+  }, [schedules]);
+
   // ------------------ ACTIVATE CURRENT SCHEDULE ------------------
   useEffect(() => {
     if (!schedules.length) return;
 
-    const nowPH = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
-    );
+    const now = new Date(); // local PC time
 
     for (const schedule of schedules) {
       const activeOccurrence = schedule.occurrences?.find((occ) => {
-        const [startH, startM] = occ.startTime.split(':').map(Number);
-        const [endH, endM] = occ.endTime.split(':').map(Number);
+        const startTime = new Date(`${occ.date}T${occ.startTime}:00`);
+        const endTime = new Date(`${occ.date}T${occ.endTime}:00`);
 
-        const startTime = new Date(nowPH);
-        startTime.setHours(startH, startM, 0, 0);
+        console.log("Start time:", startTime.toLocaleString());
+        console.log("End time:", endTime.toLocaleString());
+        console.log("Local now:", now.toLocaleString());
 
-        const endTime = new Date(nowPH);
-        endTime.setHours(endH, endM, 0, 0);
-        return nowPH >= startTime && nowPH <= endTime;
+        return now >= startTime && now <= endTime;
       });
 
       if (activeOccurrence) {
@@ -76,14 +74,12 @@ const App = () => {
                 scheduleId: schedule.id,
               },
             })
-            .then(() =>
-              console.log(`[DEBUG] Activated scheduleId=${schedule.id}`)
-            )
+            .then(() => console.log(`[DEBUG] Activated scheduleId=${schedule.id}`))
             .catch((err) => console.error('❌ Activate failed:', err));
 
           if (location.pathname === '/') navigate('/playlist');
         }
-        break;
+        break; // Only activate the first matching occurrence
       }
     }
   }, [currentTime, schedules, location.pathname, navigate, activeEventId]);
@@ -145,10 +141,7 @@ const App = () => {
 
         {isMobile ? (
           <>
-            <button
-              className="hamburger"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <button className="hamburger" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               <i className="fa fa-bars"></i>
             </button>
             {isMenuOpen && (
