@@ -8,15 +8,21 @@ import Playlist from './app/Playlist';
 import Schedule from './app/Schedule';
 import SchedulesMusic from './app/Listschedules';
 
-// ------------------ FETCH SCHEDULES ------------------
-const fetchTodaySchedules = async () => {
-  // Get today's date in PH timezone
+// ------------------ FETCH SCHEDULES (today + tomorrow) ------------------
+const fetchSchedules = async () => {
   const nowPH = new Date(
     new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
   );
-  const todayPH = nowPH.toISOString().split('T')[0]; // YYYY-MM-DD
 
-  const res = await axios.get(`http://localhost:5000/schedules?date=${todayPH}`);
+  const todayPH = nowPH.toISOString().split('T')[0];
+  const tomorrowPH = new Date(nowPH);
+  tomorrowPH.setDate(nowPH.getDate() + 1);
+  const tomorrowDate = tomorrowPH.toISOString().split('T')[0];
+
+  const res = await axios.get('http://localhost:5000/schedules', {
+    params: { dates: [todayPH, tomorrowDate] },
+  });
+
   return res.data;
 };
 
@@ -29,24 +35,59 @@ const App = () => {
   const [isHideShow, setIsHideShow] = useState(false);
   const [activeEventId, setActiveEventId] = useState(null);
 
-  // ------------------ FETCH TODAY'S SCHEDULES ------------------
+  // ------------------ FETCH SCHEDULES ------------------
   const {
     data: schedules = [],
     isLoading,
     error,
+    refetch,
   } = useQuery({
-    queryKey: ['todaySchedules'],
-    queryFn: fetchTodaySchedules,
-    refetchInterval: 60000, // auto-refetch every 1 min
+    queryKey: ['schedules'],
+    queryFn: fetchSchedules,
+    refetchInterval: 60000, // still check every 1 min
+    refetchOnWindowFocus: false,
   });
+
+  // ------------------ AUTO REFETCH AT MIDNIGHT ------------------
+  useEffect(() => {
+    const now = new Date();
+    const millisUntilMidnight =
+      new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0,
+        0,
+        5
+      ).getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      refetch(); // refresh schedules at midnight
+    }, millisUntilMidnight);
+
+    return () => clearTimeout(timer);
+  }, [refetch]);
+
+  // ------------------ SAFETY REFETCH EVERY 6 HOURS ------------------
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+    }, 6 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   // ------------------ ACTIVATE CURRENT SCHEDULE ------------------
   useEffect(() => {
     if (!schedules.length) return;
 
+    const nowLocal = new Date();
     const nowPH = new Date(
       new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })
     );
+
+    // console.log("[DEBUG] ===== Time Check =====");
+    // console.log("[DEBUG] Local PC Time:", nowLocal.toString());
+    // console.log("[DEBUG] PH Time:", nowPH.toString());
 
     for (const schedule of schedules) {
       const activeOccurrence = schedule.occurrences?.find((occ) => {
@@ -58,6 +99,12 @@ const App = () => {
 
         const endTime = new Date(nowPH);
         endTime.setHours(endH, endM, 0, 0);
+
+        // console.log(
+        //   `[DEBUG] Checking scheduleId=${schedule.id}, date=${occ.date}, ` +
+        //   `start=${startTime.toString()}, end=${endTime.toString()}`
+        // );
+
         return nowPH >= startTime && nowPH <= endTime;
       });
 
@@ -77,7 +124,7 @@ const App = () => {
               },
             })
             .then(() =>
-              console.log(`[DEBUG] Activated scheduleId=${schedule.id}`)
+              console.log(`[DEBUG] ✅ Activated scheduleId=${schedule.id}`)
             )
             .catch((err) => console.error('❌ Activate failed:', err));
 

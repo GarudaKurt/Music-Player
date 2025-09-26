@@ -178,47 +178,6 @@ app.post('/deactivate', (req, res) => {
   }
 });
 
-
-// -------------------- ROUTES --------------------
-
-// Fetch all schedules with their playlist
-// Optimized /schedules route
-{/** OPTIMIZE THE CODE
-app.get('/schedules', (req, res) => {
-  try {
-    // Fetch all at once
-    const schedules = schedulesDB.prepare(`SELECT * FROM schedules`).all();
-    const occurrences = schedulesDB.prepare(`SELECT * FROM occurrences`).all();
-    const playlist = schedulesDB.prepare(`SELECT * FROM playlist`).all();
-
-    // Group occurrences + playlist by scheduleId
-    const occurrencesMap = new Map();
-    occurrences.forEach(occ => {
-      if (!occurrencesMap.has(occ.scheduleId)) occurrencesMap.set(occ.scheduleId, []);
-      occurrencesMap.get(occ.scheduleId).push(occ);
-    });
-
-    const playlistMap = new Map();
-    playlist.forEach(song => {
-      if (!playlistMap.has(song.scheduleId)) playlistMap.set(song.scheduleId, []);
-      playlistMap.get(song.scheduleId).push(song);
-    });
-
-    // Merge
-    const schedulesWithDetails = schedules.map(s => ({
-      ...s,
-      occurrences: occurrencesMap.get(s.id) || [],
-      playlist: playlistMap.get(s.id) || []
-    }));
-
-    res.json(schedulesWithDetails);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch schedules' });
-  }
-});
-*/}
-
 // Fetch schedules with optional date or year filter
 app.get('/schedules', (req, res) => {
   try {
@@ -233,6 +192,8 @@ app.get('/schedules', (req, res) => {
       // Filter occurrences for today
       occurrencesQuery += ` WHERE date = ?`;
       occurrencesParams = [date];
+      console.log("DEBUG occur " + occurrencesParams)
+      console.log("DEBUG dates " + date)
     } else if (year) {
       // Existing year filter
       schedulesQuery += ` WHERE strftime('%Y', startDate) = ? OR strftime('%Y', endDate) = ?`;
