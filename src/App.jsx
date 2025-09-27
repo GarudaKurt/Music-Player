@@ -30,16 +30,38 @@ const App = () => {
     data: schedules = [],
     isLoading,
     error,
+    refetch, // ✅ need refetch here
   } = useQuery({
     queryKey: ['todaySchedules'],
     queryFn: fetchTodaySchedules,
     refetchInterval: 60000, // auto-refetch every 1 min
   });
 
-  // Reset activeEventId whenever schedules change
+  // ------------------ REFETCH AT MIDNIGHT ------------------
   useEffect(() => {
-    setActiveEventId(null);
-  }, [schedules]);
+    const scheduleMidnightRefetch = () => {
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0, 0, 5 // run at 00:00:05 local time
+      );
+
+      const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+      const timer = setTimeout(() => {
+        console.log("[DEBUG] Midnight reached, refetching schedules...");
+        refetch();
+        scheduleMidnightRefetch(); // reschedule for the next day
+      }, msUntilMidnight);
+
+      return () => clearTimeout(timer);
+    };
+
+    const cleanup = scheduleMidnightRefetch();
+    return cleanup;
+  }, [refetch]);
 
   // ------------------ ACTIVATE CURRENT SCHEDULE ------------------
   useEffect(() => {
