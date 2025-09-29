@@ -171,25 +171,12 @@ const Playlist = () => {
 
         if (activeSchedule) {
           console.log("STOP NOW")
-          const today = new Date().toISOString().split("T")[0];
-          axios.post("http://localhost:5000/deactivate", {
-            scheduleName: activeSchedule.scheduleName,
-            event: {
-              eventId: `${activeSchedule.id}::end::${today}::${activeSchedule.endTime}`,
-              scheduleId: activeSchedule.id,
-              date: today,
-              startTime: activeSchedule.startTime,
-              endTime: activeSchedule.endTime,
-              songs: activeSchedule.songName,
-            }
-          }).catch(err => console.error("Failed to trigger OFF:", err));
-          navigate('/')
           if (currentAudio.current) {
             currentAudio.current.pause();
             currentAudio.current.currentTime = 0;
             currentAudio.current.src = "";
           }
-
+          navigate('/')
         }
 
         isScheduledPlaying.current = false;

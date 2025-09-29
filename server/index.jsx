@@ -7,6 +7,8 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // -------------------- DATABASE --------------------
 const schedulesDB = new Database(path.join(__dirname, 'schedules.sqlite3'));
@@ -68,6 +70,11 @@ port.on('error', err => console.error('Serial port error:', err));
 
 // -------------------- APP SETUP --------------------
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+
 const PORT = 5000;
 
 app.use(cors());
@@ -87,15 +94,16 @@ const upload = multer({ storage });
 // -------------------- HELPERS --------------------
 let startIndex = new Map();
 let endIndex = new Map();
-const triggeredEvents = new Map();
+
 
 function unixSecond(date) {
   return Math.floor(date.getTime() / 1000);
 }
 
 function parseTimeToDate(dateStr, timeStr) {
-  const dt = new Date(`${dateStr}T${timeStr.padStart(5, '0')}:00`);
-  return dt;
+  const [hour, min] = timeStr.split(':').map(Number);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, hour, min, 0); // local Date
 }
 
 
@@ -113,68 +121,135 @@ function formatDateLocal(date) {
   return formatted; // YYYY-MM-DD in local (Philippine) time
 }
 
+// -------------------- SCHEDULER --------------------
+let activeSchedules = new Set();
+let todayOccurrences = [];
+
+// Load today's occurrences into memory
+function loadTodayOccurrences() {
+  const todayStr = formatDateLocal(new Date()); // local date YYYY-MM-DD
+  todayOccurrences = schedulesDB.prepare(`
+    SELECT o.*, s.scheduleName
+    FROM occurrences o
+    JOIN schedules s ON o.scheduleId = s.id
+    WHERE o.date = ?
+  `).all(todayStr);
+
+  console.log(`[SCHEDULER] Loaded ${todayOccurrences.length} occurrences for ${todayStr}`);
+}
+
+
+// Initial load
+loadTodayOccurrences();
+
+// Reload occurrences at midnight
+setTimeout(function scheduleMidnightReload() {
+  loadTodayOccurrences();
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  setTimeout(scheduleMidnightReload, nextMidnight.getTime() - now.getTime());
+}, 0);
+
+// -------------------- SCHEDULER INTERVAL (Improved) --------------------
+setInterval(() => {
+  const nowSec = unixSecond(new Date());
+
+  // --- START EVENTS ---
+  for (const [sec, occList] of startIndex) {
+    if (sec <= nowSec) { // Trigger all events that are due
+      occList.forEach(occ => {
+        if (!activeSchedules.has(occ.eventId)) {
+          activeSchedules.add(occ.eventId);
+          console.log(`[ACTIVE] Schedule ${occ.scheduleId} (${occ.scheduleName})`);
+          try { port.write("ON\n"); console.log("Arduino ON"); }
+          catch (err) { console.error("Serial write ON error:", err); }
+          io.emit("scheduleActive", occ);
+        }
+      });
+      startIndex.delete(sec); // Remove triggered events
+    }
+  }
+
+  // --- END EVENTS ---
+  for (const [sec, occList] of endIndex) {
+    if (sec <= nowSec) { // Trigger all events that are due
+      occList.forEach(occ => {
+        if (activeSchedules.has(occ.eventId)) {
+          activeSchedules.delete(occ.eventId);
+          console.log(`[INACTIVE] Schedule ${occ.scheduleId} (${occ.scheduleName})`);
+          try { port.write("OFF\n"); console.log("Arduino OFF"); }
+          catch (err) { console.error("Serial write OFF error:", err); }
+          io.emit("scheduleInactive", occ);
+        }
+      });
+      endIndex.delete(sec); // Remove triggered events
+    }
+  }
+
+}, 1000); // 1-second interval
+
+function addNewScheduleOccurrences(schedule) {
+  const start = new Date(schedule.startDate);
+  const end = new Date(schedule.endDate);
+  const weekdaysMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
+
+  let current = new Date(start);
+  while (current <= end) {
+    const dateStr = formatDateLocal(current);
+    const dayOfWeek = current.getDay();
+    const dayOfMonth = current.getDate();
+
+    let shouldInsert = false;
+    if (schedule.repeatType === "weekly") shouldInsert = schedule.weekdays.some(d => weekdaysMap[d] === dayOfWeek);
+    else if (schedule.repeatType === "monthly") shouldInsert = schedule.monthDates.includes(dayOfMonth);
+    else shouldInsert = true; // no-repeat
+
+    if (shouldInsert) {
+      // Add to in-memory occurrences (optional)
+      todayOccurrences.push({
+        scheduleId: schedule.id,
+        scheduleName: schedule.scheduleName,
+        date: dateStr,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime
+      });
+
+      // --- ADD TO INDEXES ---
+      const startDt = parseTimeToDate(dateStr, schedule.startTime);
+      const endDt = parseTimeToDate(dateStr, schedule.endTime);
+
+      const startSec = unixSecond(startDt);
+      const endSec = unixSecond(endDt);
+
+      const startEventId = `${schedule.id}::start::${dateStr}::${schedule.startTime}`;
+      const endEventId = `${schedule.id}::end::${dateStr}::${schedule.endTime}`;
+
+      addToIndex(startIndex, startSec, {
+        eventId: startEventId,
+        scheduleId: schedule.id,
+        scheduleName: schedule.scheduleName,
+        date: dateStr,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        playlist: [] // optional, or fetch from DB
+      });
+
+      addToIndex(endIndex, endSec, {
+        eventId: endEventId,
+        scheduleId: schedule.id,
+        scheduleName: schedule.scheduleName,
+        date: dateStr,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        playlist: []
+      });
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+}
+
 // -------------------- NEW API ROUTES --------------------
-
-// Trigger ON manually
-app.post('/activate', (req, res) => {
-  try {
-    const { scheduleName, event } = req.body;
-    if (!scheduleName || !event) {
-      return res.status(400).json({ error: 'Missing scheduleName or event' });
-    }
-
-    if (triggeredEvents.has(event.eventId)) {
-      return res.status(200).json({ message: 'Event already triggered ON recently' });
-    }
-
-    triggeredEvents.set(event.eventId, Date.now());
-    console.log(`Schedule "${scheduleName}" starts soon! Turning ON`);
-
-    port.write("ON\n");
-    console.log("Schedule Arduino ON");
-
-    res.status(200).json({ message: `Trigger ON executed for ${scheduleName}` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to trigger ON' });
-  }
-});
-
-// Trigger OFF manually
-app.post('/deactivate', (req, res) => {
-  try {
-    const { scheduleName, event } = req.body;
-    if (!scheduleName || !event) {
-      return res.status(400).json({ error: 'Missing scheduleName or event' });
-    }
-
-    if (triggeredEvents.has(event.eventId)) {
-      return res.status(200).json({ message: 'Event already triggered OFF recently' });
-    }
-
-    triggeredEvents.set(event.eventId, Date.now());
-    console.log(`Schedule "${scheduleName}" ended. Turning OFF`);
-
-    port.write("OFF\n");
-    console.log("Schedule Arduino OFF");
-
-    // Retain delete query
-    schedulesDB.prepare(`
-      DELETE FROM occurrences 
-      WHERE scheduleId = ? AND date = ? AND startTime = ? AND endTime = ?
-    `).run(event.scheduleId, event.date, event.startTime, event.endTime);
-
-    console.log(`Occurrence removed: scheduleId=${event.scheduleId}, date=${event.date}, time=${event.startTime}-${event.endTime}`);
-
-    // Rebuild indexes to keep scheduler accurate
-    buildIndexesFromDB();
-
-    res.status(200).json({ message: `Trigger OFF executed for ${scheduleName}` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to trigger OFF' });
-  }
-});
 
 // Fetch schedules with optional date or year filter
 app.get('/schedules', (req, res) => {
@@ -227,58 +302,64 @@ app.get('/schedules', (req, res) => {
   }
 });
 
-// Add new schedule
 app.post('/schedules', (req, res) => {
   try {
-    const { scheduleName, startDate, endDate, startTime, endTime, songs, repeatType, weekdays, monthDates } = req.body;
+    const {
+      scheduleName,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      songs,
+      repeatType,
+      weekdays = [],
+      monthDates = []
+    } = req.body;
+
     if (!scheduleName || !startDate || !endDate || !startTime || !endTime || !songs || songs.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // --- CONFLICT CHECK ---
     const existingOccurrences = schedulesDB.prepare(`SELECT * FROM occurrences`).all();
-
-    let current = new Date(startDate);
-    const end = new Date(endDate);
     const weekdaysMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
 
+    const scheduleDates = [];
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Precompute all dates this schedule will occur
     while (current <= end) {
       const dateStr = formatDateLocal(current);
       const dayOfWeek = current.getDay();
       const dayOfMonth = current.getDate();
 
       let shouldInsert = false;
-      if (repeatType === "weekly") {
-        shouldInsert = weekdays.some(d => weekdaysMap[d] === dayOfWeek);
-      } else if (repeatType === "monthly") {
-        shouldInsert = monthDates.includes(dayOfMonth);
-      } else {
-        shouldInsert = true; // no-repeat
-      }
+      if (repeatType === "weekly") shouldInsert = weekdays.some(d => weekdaysMap[d] === dayOfWeek);
+      else if (repeatType === "monthly") shouldInsert = monthDates.includes(dayOfMonth);
+      else shouldInsert = true;
 
-      if (shouldInsert) {
-        const conflicts = existingOccurrences.filter(occ => {
-          if (occ.date !== dateStr) return false;
-
-          const newStart = new Date(`${dateStr}T${startTime}`);
-          const newEnd = new Date(`${dateStr}T${endTime}`);
-          const occStart = new Date(`${occ.date}T${occ.startTime}`);
-          const occEnd = new Date(`${occ.date}T${occ.endTime}`);
-          if (newStart.getTime() === occStart.getTime()) {
-            return true;
-          }
-
-          return (newStart < occEnd && newEnd > occStart);
-        });
-
-        if (conflicts.length > 0) {
-          return res.status(409).json({ error: 'Conflict schedule detected' });
-        }
-      }
+      if (shouldInsert) scheduleDates.push(dateStr);
 
       current.setDate(current.getDate() + 1);
     }
 
+    // Check for conflicts
+    for (const dateStr of scheduleDates) {
+      const conflicts = existingOccurrences.filter(occ => {
+        if (occ.date !== dateStr) return false;
+        const newStart = new Date(`${dateStr}T${startTime}`);
+        const newEnd = new Date(`${dateStr}T${endTime}`);
+        const occStart = new Date(`${occ.date}T${occ.startTime}`);
+        const occEnd = new Date(`${occ.date}T${occ.endTime}`);
+        return newStart.getTime() === occStart.getTime() || (newStart < occEnd && newEnd > occStart);
+      });
+
+      if (conflicts.length > 0) {
+        return res.status(409).json({ error: `Conflict schedule detected on ${dateStr}` });
+      }
+    }
+
+    // Insert schedule
     const result = schedulesDB.prepare(`
       INSERT INTO schedules (scheduleName, startDate, endDate, startTime, endTime, repeatType, weekdays)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -286,46 +367,45 @@ app.post('/schedules', (req, res) => {
 
     const scheduleId = result.lastInsertRowid;
 
+    // Insert occurrences
     const insertOcc = schedulesDB.prepare(`
       INSERT INTO occurrences (scheduleId, date, startTime, endTime)
       VALUES (?, ?, ?, ?)
     `);
+    scheduleDates.forEach(dateStr => insertOcc.run(scheduleId, dateStr, startTime, endTime));
 
-    current = new Date(startDate);
-    while (current <= end) {
-      const dateStr = formatDateLocal(current);
-      const dayOfWeek = current.getDay();
-      const dayOfMonth = current.getDate();
-
-      let shouldInsert = false;
-      if (repeatType === "weekly") {
-        shouldInsert = weekdays.some(d => weekdaysMap[d] === dayOfWeek);
-      } else if (repeatType === "monthly") {
-        shouldInsert = monthDates.includes(dayOfMonth);
-      } else {
-        shouldInsert = true;
-      }
-
-      if (shouldInsert) {
-        insertOcc.run(scheduleId, dateStr, startTime, endTime);
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
+    // Insert playlist
     const insertSong = schedulesDB.prepare(`
       INSERT INTO playlist (scheduleId, songName, songArtist, songSrc, songAvatar)
       VALUES (?, ?, ?, ?, ?)
     `);
-
     songs.forEach(song => insertSong.run(scheduleId, song.songName, song.songArtist, song.songSrc, song.songAvatar || null));
 
-    res.status(201).json({ message: 'Schedule saved', scheduleId });
+    // ------------------------ KEY CHANGES ------------------------
+    // 1. Update todayOccurrences in memory
+    addNewScheduleOccurrences({
+      id: scheduleId,
+      scheduleName,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      repeatType,
+      weekdays,
+      monthDates
+    });
+
+    // 2. Immediately rebuild start/end indexes so the scheduler can trigger new events
+    buildIndexesFromDB();
+    // ----------------------------------------------------------------
+
+    res.status(201).json({ message: 'Schedule saved and active', scheduleId });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to save schedule' });
   }
 });
-
 
 // Upload song
 app.post('/uploads', upload.single('songFile'), (req, res) => {
@@ -502,9 +582,10 @@ app.post('/manual-play', (req, res) => {
 });
 
 // -------------------- SCHEDULER --------------------
+// Rebuild indexes from DB
 function buildIndexesFromDB() {
-  startIndex = new Map();
-  endIndex = new Map();
+  startIndex.clear();
+  endIndex.clear();
 
   const schedules = schedulesDB.prepare(`SELECT * FROM schedules`).all();
 
@@ -515,22 +596,45 @@ function buildIndexesFromDB() {
     occurrences.forEach(occ => {
       const startDt = parseTimeToDate(occ.date, occ.startTime);
       const endDt = parseTimeToDate(occ.date, occ.endTime);
-      const startNotifyDt = new Date(startDt.getTime() - 2 * 60 * 1000);
 
-      const startSec = unixSecond(startNotifyDt);
+      const startSec = unixSecond(startDt);
       const endSec = unixSecond(endDt);
 
       const startEventId = `${schedule.id}::start::${occ.date}::${occ.startTime}`;
       const endEventId = `${schedule.id}::end::${occ.date}::${occ.endTime}`;
 
-      addToIndex(startIndex, startSec, { eventId: startEventId, scheduleId: schedule.id, scheduleName: schedule.scheduleName, date: occ.date, startTime: occ.startTime, endTime: occ.endTime, playlist });
-      addToIndex(endIndex, endSec, { eventId: endEventId, scheduleId: schedule.id, scheduleName: schedule.scheduleName, date: occ.date, startTime: occ.startTime, endTime: occ.endTime, playlist });
+      addToIndex(startIndex, startSec, {
+        eventId: startEventId,
+        scheduleId: schedule.id,
+        scheduleName: schedule.scheduleName,
+        date: occ.date,
+        startTime: occ.startTime,
+        endTime: occ.endTime,
+        playlist
+      });
+
+      addToIndex(endIndex, endSec, {
+        eventId: endEventId,
+        scheduleId: schedule.id,
+        scheduleName: schedule.scheduleName,
+        date: occ.date,
+        startTime: occ.startTime,
+        endTime: occ.endTime,
+        playlist
+      });
     });
   });
 
-  console.log(`Indexes rebuilt: startIndex keys=${startIndex.size}, endIndex keys=${endIndex.size}`);
 }
-
+buildIndexesFromDB()
 
 // -------------------- START SERVER --------------------
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
+});
