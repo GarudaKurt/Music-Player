@@ -150,7 +150,7 @@ setTimeout(function scheduleMidnightReload() {
   setTimeout(scheduleMidnightReload, nextMidnight.getTime() - now.getTime());
 }, 0);
 
-// -------------------- SCHEDULER INTERVAL (Improved) --------------------
+// -------------------- SCHEDULER INTERVAL (Fixed) --------------------
 setInterval(() => {
   const nowSec = unixSecond(new Date());
 
@@ -158,8 +158,10 @@ setInterval(() => {
   for (const [sec, occList] of startIndex) {
     if (sec <= nowSec) { // Trigger all events that are due
       occList.forEach(occ => {
-        if (!activeSchedules.has(occ.eventId)) {
-          activeSchedules.add(occ.eventId);
+        const scheduleEventId = `${occ.scheduleId}::${occ.date}`; // consistent ID
+
+        if (!activeSchedules.has(scheduleEventId)) {
+          activeSchedules.add(scheduleEventId);
           console.log(`[ACTIVE] Schedule ${occ.scheduleId} (${occ.scheduleName})`);
           try { port.write("ON\n"); console.log("Arduino ON"); }
           catch (err) { console.error("Serial write ON error:", err); }
@@ -174,8 +176,10 @@ setInterval(() => {
   for (const [sec, occList] of endIndex) {
     if (sec <= nowSec) { // Trigger all events that are due
       occList.forEach(occ => {
-        if (activeSchedules.has(occ.eventId)) {
-          activeSchedules.delete(occ.eventId);
+        const scheduleEventId = `${occ.scheduleId}::${occ.date}`; // same consistent ID
+
+        if (activeSchedules.has(scheduleEventId)) {
+          activeSchedules.delete(scheduleEventId);
           console.log(`[INACTIVE] Schedule ${occ.scheduleId} (${occ.scheduleName})`);
           try { port.write("OFF\n"); console.log("Arduino OFF"); }
           catch (err) { console.error("Serial write OFF error:", err); }
@@ -187,6 +191,7 @@ setInterval(() => {
   }
 
 }, 1000); // 1-second interval
+
 
 function addNewScheduleOccurrences(schedule) {
   const start = new Date(schedule.startDate);
